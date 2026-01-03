@@ -93,7 +93,7 @@ public class BaseBotAuto extends LinearOpMode {
         );
         Actions.runBlocking(
                 robot.actionBuilder(new Pose2d(new Vector2d(37, -24), Math.toRadians(265)))
-                        .lineToY(-30)
+                        .lineToY(-30, )
                         .lineToY(-30)
                         .build()
         );
