@@ -1,8 +1,23 @@
 package org.firstinspires.ftc.teamcode;
 
+import androidx.annotation.NonNull;
+
+import com.acmerobotics.roadrunner.AccelConstraint;
+import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.Arclength;
+import com.acmerobotics.roadrunner.MinMax;
 import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.Pose2dDual;
+import com.acmerobotics.roadrunner.PosePath;
 import com.acmerobotics.roadrunner.PoseVelocity2d;
+import com.acmerobotics.roadrunner.ProfileAccelConstraint;
+import com.acmerobotics.roadrunner.SequentialAction;
+import com.acmerobotics.roadrunner.Trajectory;
+import com.acmerobotics.roadrunner.TrajectoryBuilder;
+import com.acmerobotics.roadrunner.TrajectoryBuilderParams;
+import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.VelConstraint;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.LLResultTypes;
@@ -56,6 +71,8 @@ public class BaseBotAuto extends LinearOpMode {
         boolean lastSeenBall = false;
 //        double start = getRuntime();
         double lastBallTime = getRuntime();
+
+        /*
         while (balls > 0) {
             boolean ballin = robot.distance1.getState();
             telemetry.addData("ballin", ballin);
@@ -83,18 +100,24 @@ public class BaseBotAuto extends LinearOpMode {
             }
             telemetry.update();
         }
+        */
         sleep(250);
+        Actions.runBlocking(new SequentialAction(
+                robot.spinUpShooter(),
+                robot.shootBall(3)
+        ));
 
-        robot.intake.setPower(1);
+//        robot.intake.setPower(1);
+//        Pose2d currentPose = robot.localizer.getPose();
         Actions.runBlocking(
-                robot.actionBuilder(new Pose2d(new Vector2d(60, -7.125), Math.toRadians(200)))
-                        .strafeToSplineHeading(new Vector2d(37, -24), Math.toRadians(265))
+                robot.actionBuilder(robot.localizer.getPose())
+                        .strafeToSplineHeading(new Vector2d(37, -24), (3*Math.PI)/2)
                         .build()
         );
         Actions.runBlocking(
                 robot.actionBuilder(new Pose2d(new Vector2d(37, -24), Math.toRadians(265)))
-                        .lineToY(-30, )
-                        .lineToY(-30)
+                        .lineToY(-30, new TranslationalVelConstraint(20.0))
+                        .waitSeconds(0.1)
                         .build()
         );
         // TODO Implement Intake

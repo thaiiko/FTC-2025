@@ -19,5 +19,5 @@
             <ControlHubImuBHI260AP name="imu" port="0" bus="0" />
         </LynxModule>
     </LynxUsbDevice>
-    <EthernetDevice name="limelight" serialNumber="EthernetOverUsb:eth0:172.29.0.30" name="limelight" port="-1" ipAddress="172.29.0.1" />
+    <EthernetDevice serialNumber="EthernetOverUsb:eth0:172.29.0.30" name="limelight" port="-1" ipAddress="172.29.0.1" />
 </Robot>

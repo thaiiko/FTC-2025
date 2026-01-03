@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
@@ -14,6 +16,7 @@ import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
 
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
+import org.jetbrains.annotations.NotNull;
 
 public class RobotHardware extends MecanumDrive {
     public DcMotorEx frontLeft;
@@ -101,5 +104,75 @@ public class RobotHardware extends MecanumDrive {
     public void setShooterPower(double power) {
         lShooter.setPower(power);
         rShooter.setPower(power);
+    }
+
+    public double getVelocity() {
+        return lShooter.getVelocity();
+    }
+    public void setShooterVelocity(double velocity) {
+        lShooter.setVelocity(velocity);
+        rShooter.setVelocity(velocity);
+    }
+    public Action startIntake() {
+        return new IntakeStart();
+    }
+
+    public class IntakeStart implements Action {
+        private boolean initalized = false;
+
+        @Override
+        public boolean run(@NotNull TelemetryPacket packet) {
+            if (!initalized) {
+                intake.setPower(1);
+                initalized = true;
+            }
+
+            return false;
+        }
+    }
+    public Action spinUpShooter() {
+        return new Action () {
+          private boolean initialized = false;
+
+          @Override
+          public boolean run(@NotNull TelemetryPacket packet) {
+              if(!initialized) {
+                  setShooterVelocity(1100);
+                  initialized = true;
+              }
+
+              double vel =  lShooter.getVelocity();
+              packet.put("vel", vel);
+              return vel < 1_100;
+          }
+        };
+    }
+    public Action shootBall(int ballsToShoot) {
+        return new Action() {
+            private int balls = ballsToShoot;
+            private boolean lastSeenBall = false;
+
+            @Override
+            public boolean run(@NotNull TelemetryPacket packet) {
+                if (lShooter.getVelocity() > 1000 && lShooter.getVelocity() < 1140) {
+                    index.setPower(0.8);
+                    intake.setPower(1);
+                    packet.put("debug balls", balls);
+
+                    if (distance1.getState() && !lastSeenBall) {
+                        balls--;
+                        lastSeenBall = true;
+                    } else {
+                        lastSeenBall = false;
+                    }
+
+                    return balls >= 0;
+                } else {
+                    index.setPower(0);
+                    intake.setPower(0);
+                    return true;
+                }
+            }
+        };
     }
 }
