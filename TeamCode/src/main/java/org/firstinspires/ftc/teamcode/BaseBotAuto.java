@@ -110,15 +110,16 @@ public class BaseBotAuto extends LinearOpMode {
 //        robot.intake.setPower(1);
 //        Pose2d currentPose = robot.localizer.getPose();
         Actions.runBlocking(
-                robot.actionBuilder(robot.localizer.getPose())
-                        .strafeToSplineHeading(new Vector2d(37, -24), (3*Math.PI)/2)
-                        .build()
-        );
-        Actions.runBlocking(
-                robot.actionBuilder(new Pose2d(new Vector2d(37, -24), Math.toRadians(265)))
-                        .lineToY(-30, new TranslationalVelConstraint(20.0))
-                        .waitSeconds(0.1)
-                        .build()
+                new SequentialAction(
+                        robot.actionBuilder(robot.localizer.getPose())
+                                .strafeToSplineHeading(new Vector2d(37, -24), (3*Math.PI)/2)
+                                .build(),
+                        robot.startIntake(),
+                        robot.actionBuilder(robot.localizer.getPose())
+                                .waitSeconds(0.4)
+                                .lineToY(-30, new TranslationalVelConstraint(20.0))
+                                .build()
+                )
         );
         // TODO Implement Intake
 
