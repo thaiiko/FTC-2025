@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.teleop;
 
 import com.acmerobotics.roadrunner.Pose2d;
 import com.qualcomm.hardware.limelightvision.LLResult;
@@ -6,7 +6,10 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+
+import org.firstinspires.ftc.teamcode.Pipeline;
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
+import org.firstinspires.ftc.teamcode.RobotHardware;
 
 import java.util.List;
 
@@ -99,7 +102,7 @@ public class BasebotTeleOp extends LinearOpMode {
             telemetry.addData("Actual RPM", rpm);
             telemetry.addData("Shooter RPM", targetRPM);
 
-            targetRPM = ((120 * velocity) / (Math.PI * 0.315)) * 1.2;
+//            targetRPM = ((120 * velocity) / (Math.PI * 0.315)) * 1.2;
             double velocityTarget = (targetRPM * TICKS_PER_REV) / 60;
 
 
@@ -208,14 +211,14 @@ public class BasebotTeleOp extends LinearOpMode {
             // D-pad shooter control logic
             if (gamepad1.dpad_up && !previousDpadUp) {
 //                shooterPower = Math.min(1.0, shooterPower + 0.01); // Clamp power at 1.0
-//                targetRPM += 50;
-                targetDistance += 0.25;
+                targetRPM += 50;
+//                targetDistance += 0.25;
             }
 
             if (gamepad1.dpad_down && !previousDpadDown) {
 //                shooterPower = Math.max(0.0, shooterPower - 0.01); // Clamp power at 0.0
-//                targetRPM -= 50;
-                targetDistance += 0.25;
+                targetRPM -= 50;
+//                targetDistance += 0.25;
             }
 
             telemetry.addData("Target RPM", targetRPM);

@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode;
+package org.firstinspires.ftc.teamcode.roadrunner;
 
 import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.roadrunner.DualNum;
@@ -23,13 +23,14 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.AngularVelocity;
 import org.firstinspires.ftc.robotcore.external.navigation.UnnormalizedAngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import org.firstinspires.ftc.teamcode.Localizer;
 import org.firstinspires.ftc.teamcode.messages.TwoDeadWheelInputsMessage;
 
 @Config
 public final class TwoDeadWheelLocalizer implements Localizer {
     public static class Params {
-        public double parYTicks = -986.7085995833684; // y position of the parallel encoder (in tick units)
-        public double perpXTicks = -575.6071334516467 ; // x position of the perpendicular encoder (in tick units)
+        public double parYTicks = -953.3323765076996; // y position of the parallel encoder (in tick units)
+        public double perpXTicks = -580.0203235462603; // x position of the perpendicular encoder (in tick units)
     }
 
     public static Params PARAMS = new Params();
