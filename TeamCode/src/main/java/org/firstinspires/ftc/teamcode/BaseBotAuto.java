@@ -121,7 +121,16 @@ public class BaseBotAuto extends LinearOpMode {
                                 .build()
                 )
         );
-        // TODO Implement Intake
+
+        // run back to the back shooting area.
+        Actions.runBlocking(
+                robot.actionBuilder(robot.localizer.getPose())
+                        .strafeToSplineHeading(new Vector2d(60, -7.125), Math.toRadians(200))
+                        .build()
+        );
+        Actions.runBlocking(
+                robot.shootBall(3)
+        );
 
     }
 }
