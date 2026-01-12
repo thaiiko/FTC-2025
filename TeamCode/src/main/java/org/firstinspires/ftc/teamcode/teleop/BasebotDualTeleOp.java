@@ -6,6 +6,7 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.teamcode.Pipeline;
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
@@ -94,6 +95,10 @@ public class BasebotDualTeleOp extends LinearOpMode {
         telemetry.update();
 
         limelight.pipelineSwitch(selectedPipeline.getValue());
+
+        Gamepad lastGamepad1 = new Gamepad();
+        Gamepad lastGamepad2 = new Gamepad();
+
         waitForStart();
 
         while (opModeIsActive()) {
@@ -172,7 +177,7 @@ public class BasebotDualTeleOp extends LinearOpMode {
             double intakePower = 0.0;
             final double RT_THRESHOLD = 0.1;
 
-            if (gamepad1.dpad_left && !previous_left) {
+            if (gamepad2.dpad_left && !lastGamepad2.dpad_left) {
                 left_toggle = !left_toggle;
             }
 
@@ -192,7 +197,7 @@ public class BasebotDualTeleOp extends LinearOpMode {
                 // D-pad Left: Intake
                 intakePower = 0.8;
                 indexPower = 0.0;
-            } else if (gamepad2.y && !previousY) {
+            } else if (gamepad2.y && !lastGamepad1.y) {
                 // Gamepad Y: Index Reverse (to clear jams - momentary press)
                 indexPower = -0.5;
                 intakePower = 0.0;
@@ -204,18 +209,18 @@ public class BasebotDualTeleOp extends LinearOpMode {
             // Update previous state for momentary button presses
             // --------------------------------------------------------------------------------
 
-            if (gamepad1.b && !lastB) {
+            if (gamepad1.b && !lastGamepad1.b) {
                 bToggle = !bToggle;
             }
 
             // D-pad shooter control logic
-            if (gamepad2.dpad_up && !previousDpadUp) {
+            if (gamepad2.dpad_up && !lastGamepad2.dpad_up) {
 //                shooterPower = Math.min(1.0, shooterPower + 0.01); // Clamp power at 1.0
                 targetRPM += 50;
 //                targetDistance += 0.25;
             }
 
-            if (gamepad2.dpad_down && !previousDpadDown) {
+            if (gamepad2.dpad_down && !lastGamepad2.dpad_down) {
 //                shooterPower = Math.max(0.0, shooterPower - 0.01); // Clamp power at 0.0
                 targetRPM -= 50;
 //                targetDistance += 0.25;
@@ -230,7 +235,7 @@ public class BasebotDualTeleOp extends LinearOpMode {
             }
 
             // Xtoggle
-            if (gamepad1.x && !lastX) {
+            if (gamepad1.x && !lastGamepad1.x) {
                 xToggle = !xToggle;
             }
 
@@ -247,11 +252,8 @@ public class BasebotDualTeleOp extends LinearOpMode {
             }
 
             // Update Toggles
-            lastX = gamepad1.x;
-            previousDpadDown = gamepad2.dpad_down;
-            previousDpadUp = gamepad2.dpad_up;
-            lastB = gamepad1.b;
-            previousY = gamepad1.y;
+            lastGamepad1 = gamepad1;
+            lastGamepad2 = gamepad2;
 
 
             // Update Telemetry
