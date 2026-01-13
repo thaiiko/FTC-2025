@@ -8,6 +8,7 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.teamcode.Pipeline;
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
@@ -17,16 +18,16 @@ import org.firstinspires.ftc.teamcode.RobotState;
 import java.util.List;
 
 
-@TeleOp(name = "BaseBot Dual Teleop")
-public class BasebotDualTeleOp extends LinearOpMode {
+@TeleOp(name = "BaseBot Unified Teleop")
+public class BasebotUnifiedTeleOp extends LinearOpMode {
     // --- Constants for Ballistic Solver ---
     private static final double TARGET_FEET = 3.875; // Target height above launcher in feet
-    private static final double LAUNCH_ANGLE_DEG = 48.0; // Updated to match empirical data (~6ft at ~1600RPM)
+    private static final double LAUNCH_ANGLE_DEG = 48.0;
     private static final double LAUNCH_ANGLE_RAD = Math.toRadians(LAUNCH_ANGLE_DEG);
     private static final double GRAVITY_FT_S2 = 32.2; // Gravity in ft/s^2
     private static final double SHOOTER_WHEEL_DIAMETER_FT = 0.315; // Diameter of shooter wheel in feet
     private static final double RPM_EMPIRICAL_FACTOR = 1.2;
-    private static final double RPM_MAGIC_CONSTANT = 120.0; // Likely a gearing or empirical factor, replacing raw 120.0
+    private static final double RPM_MAGIC_CONSTANT = 120.0;
 
     // --- State Variables ---
     private double targetDistance; // Calculated distance to target in feet
@@ -39,6 +40,17 @@ public class BasebotDualTeleOp extends LinearOpMode {
     RobotHardware robot;
     Limelight3A limelight;
 
+    // Controller mode flag: true = gamepad2 for mechanisms, false = gamepad1 for all
+    boolean isDualMode = false;
+
+    /**
+     * Returns the gamepad used for mechanism controls.
+     * Always returns a fresh reference to avoid stale data issues.
+     */
+    private Gamepad getMechanismGamepad() {
+        return isDualMode ? gamepad2 : gamepad1;
+    }
+
     @Override
     public void runOpMode() {
         // --- Initialization and Toggles ---
@@ -46,7 +58,7 @@ public class BasebotDualTeleOp extends LinearOpMode {
 
         boolean previousDpadUp = false;
         boolean previousDpadDown = false;
-        boolean previousY2 = false; // For gamepad2.y (Index Reverse)
+        boolean previousY = false; // For mechanism gamepad Y (Index Reverse)
         boolean shooterOn = false;
 
         // --- Shooter Motor Ticks Conversion ---
@@ -60,8 +72,8 @@ public class BasebotDualTeleOp extends LinearOpMode {
         boolean bToggle = false; // Limelight Steering Toggle (gamepad1.b)
         boolean lastB = false;
 
-        boolean xToggle = false; // Auto Speed Toggle (gamepad2.x)
-        boolean lastX2 = false;
+        boolean xToggle = false; // Auto Speed Toggle (mechanism gamepad x)
+        boolean lastX = false;
 
 
         robot = new RobotHardware(hardwareMap, RobotState.getCurrentPose());
@@ -69,22 +81,55 @@ public class BasebotDualTeleOp extends LinearOpMode {
 
         robot.prism.setStripLength(29);
 
-        // --- Pipeline Selection in Init ---
+        // --- Controller Mode and Pipeline Selection in Init ---
+        boolean modeSelected = false;
+        
+        telemetry.addLine("=== CONTROLLER MODE ===");
+        telemetry.addLine("Press LEFT BUMPER: Single Driver (gamepad1 controls all)");
+        telemetry.addLine("Press RIGHT BUMPER: Dual Driver (gamepad2 for mechanisms)");
+        telemetry.addLine("");
+        telemetry.addLine("After selecting mode, choose pipeline:");
+        telemetry.addLine("X = Blue | B = Red | A = Motif");
+        telemetry.update();
+
         while (opModeInInit()) {
-            if (gamepad1.x) {
-                selectedPipeline = Pipeline.BLUE_PIPELINE;
-                robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_1);
-                break;
-            } else if (gamepad1.b) {
-                selectedPipeline = Pipeline.RED_PIPELINE;
-                robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_0);
-                break;
-            } else if (gamepad1.a) {
-                selectedPipeline = Pipeline.MOTIF_PIPELINE;
-                break;
+            // Controller mode selection
+            if (!modeSelected) {
+                if (gamepad1.left_bumper) {
+                    isDualMode = false;
+                    modeSelected = true;
+                    telemetry.addData("Mode", "SINGLE DRIVER (gamepad1)");
+                    telemetry.addLine("Now select pipeline: X=Blue, B=Red, A=Motif");
+                    telemetry.update();
+                    sleep(300); // Debounce
+                } else if (gamepad1.right_bumper) {
+                    isDualMode = true;
+                    modeSelected = true;
+                    telemetry.addData("Mode", "DUAL DRIVER (gamepad2 for mechanisms)");
+                    telemetry.addLine("Now select pipeline: X=Blue, B=Red, A=Motif");
+                    telemetry.update();
+                    sleep(300); // Debounce
+                }
+            }
+            
+            // Pipeline selection (only after mode is selected)
+            if (modeSelected) {
+                if (gamepad1.x) {
+                    selectedPipeline = Pipeline.BLUE_PIPELINE;
+                    robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_1);
+                    break;
+                } else if (gamepad1.b) {
+                    selectedPipeline = Pipeline.RED_PIPELINE;
+                    robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_0);
+                    break;
+                } else if (gamepad1.a) {
+                    selectedPipeline = Pipeline.MOTIF_PIPELINE;
+                    break;
+                }
             }
         }
 
+        telemetry.addData("Controller Mode", isDualMode ? "Dual Driver" : "Single Driver");
         telemetry.addData("Selected Pipeline", selectedPipeline.name());
         telemetry.addData("Status", "Initialized");
         telemetry.update();
@@ -152,7 +197,7 @@ public class BasebotDualTeleOp extends LinearOpMode {
             double rxModifier = 0.0;
             if (bToggle) {
                 // Add assist to rotation
-                rxModifier = (tx / 27.25) * 0.4;
+                rxModifier = (tx / 27.25) * (isDualMode ? 0.4 : 0.8);
                 turn += rxModifier;
             }
 
@@ -171,79 +216,33 @@ public class BasebotDualTeleOp extends LinearOpMode {
                     ),
                     turn // Rotational (heading)
             ));
-            
-            /*
-            // --- OLD DRIVE CONTROL LOGIC (Mecanum Math) ---
-            
-            // NOTE: rxModifier was previously declared as a local variable here (double rxModifier = 0.0) 
-            // and is now declared above in the new drive control section.
-
-            // Limelight Steering Assist Calculation (Using old 0.8 coefficient)
-            // if (bToggle) {
-            //     rxModifier = ((tx/27.25) * 0.8);
-            // } else {
-            //     rxModifier = 0.0;
-            // }
-
-            // Telemetry for Limelight Data
-            // NOTE: Telemetry is now placed in the new active Drive Control section.
-            // if (!(tx == 0.0 && ty == 0.0 && ta == 0.0)) {
-            //     telemetry.addData("Target X (tx)", tx);
-            //     telemetry.addData("Target Y (ty)", ty);
-            //     telemetry.addData("Target Area (ta)", ta);
-            // }
-
-            // Get stick inputs
-            // ly = -gamepad1.left_stick_y; // Variable removed
-            // lx = gamepad1.left_stick_x; // Variable removed
-
-            // Calculate rotation (rx), applying Limelight assist if toggled
-            // if (bToggle) {
-            //     rx = -gamepad1.right_stick_x * 0.85 + (rxModifier * 0.3);
-            // } else {
-            //     rx = -gamepad1.right_stick_x * 0.85;
-            // }
-
-            // Mecanum Drive Math
-            // double divisor = Math.max(Math.abs(ly) + Math.abs(lx) + Math.abs(rx), 1.0);
-            // double frontLeftPower = (ly + lx + rx) / divisor;
-            // double backLeftPower = (ly - lx + rx) / divisor;
-            // double frontRightPower = (ly - lx - rx) / divisor;
-            // double backRightPower = (ly + lx - rx) / divisor;
-
-            // Apply power with slowdown
-            // final double SLOWDOWN_FACTOR = 0.85;
-            // robot.frontLeft.setPower(frontLeftPower * SLOWDOWN_FACTOR);
-            // robot.frontRight.setPower(frontRightPower * SLOWDOWN_FACTOR);
-            // robot.backLeft.setPower(backLeftPower * SLOWDOWN_FACTOR);
-            // robot.backRight.setPower(backRightPower * SLOWDOWN_FACTOR);
-            */
 
             robot.updatePoseEstimate();
             telemetry.addData("Distance Sensor", robot.distance1.getState());
 
 
-            // --- Consolidated Intake and Index Control ---
+            // --- Consolidated Intake and Index Control (using getMechanismGamepad()) ---
             double indexPower = 0.0;
             double intakePower = 0.0;
             final double RT_THRESHOLD = 0.1;
 
-            // Control based on Gamepad 2
-            if (gamepad2.right_trigger > RT_THRESHOLD) {
+            Gamepad mechGP = getMechanismGamepad();
+
+            if (mechGP.right_trigger > RT_THRESHOLD) {
                 // RT pressed: Shoot (Index feed, Intake stop)
                 if (shooterOn) {
                     indexPower = 1.0; // Index feed
                     intakePower = 0.0; // Stop intake while shooting
                 }
-            } else if (gamepad2.dpad_right) {
+            } else if (mechGP.dpad_right) {
                 // D-pad Right: Intake Reverse/Outtake
                 intakePower = -0.8;
                 indexPower = 0.0;
-            } else if (gamepad2.dpad_left) {
+            } else if (mechGP.dpad_left) {
                 // D-pad Left: Intake
                 intakePower = 0.8;
                 indexPower = 0.0;
-            } else if (gamepad2.y && !previousY2) {
+            } else if (mechGP.y && !previousY) {
                 // Gamepad Y: Index Reverse (to clear jams - momentary press)
                 indexPower = -0.5;
                 intakePower = 0.0;
@@ -252,27 +251,32 @@ public class BasebotDualTeleOp extends LinearOpMode {
             robot.index.setPower(indexPower);
             robot.intake.setPower(intakePower);
 
-            // --- Shooter Power Adjustments (Gamepad 2 DPAD) ---
-            if (gamepad2.dpad_up && !previousDpadUp) {
+            // --- Shooter Power Adjustments (mechanism gamepad DPAD) ---
+            if (mechGP.dpad_up && !previousDpadUp) {
                 shooterPower = Math.min(1.0, shooterPower + 0.01);
             }
 
-            if (gamepad2.dpad_down && !previousDpadDown) {
+            if (mechGP.dpad_down && !previousDpadDown) {
                 shooterPower = Math.max(0.0, shooterPower - 0.01);
             }
 
             telemetry.addData("Manual Shooter Power", shooterPower);
 
             // Shooter On/Off Toggles
-            if (gamepad2.right_bumper) {
+            if (mechGP.right_bumper) {
                 shooterOn = true;
-            } else if (gamepad2.left_bumper) {
+            } else if (mechGP.left_bumper) {
                 shooterOn = false;
             }
 
-            // Auto/Manual Speed Toggle (gamepad2.x)
-            if (gamepad2.x && !lastX2) {
+            // Auto/Manual Speed Toggle (mechanism gamepad x)
+            if (mechGP.x && !lastX) {
                 xToggle = !xToggle;
+            }
+
+            // Limelight steering toggle (always gamepad1.b)
+            if (gamepad1.b && !lastB) {
+                bToggle = !bToggle;
             }
 
             // Apply Shooter Power
@@ -292,15 +296,16 @@ public class BasebotDualTeleOp extends LinearOpMode {
             }
 
             // --- Update Toggles/Previous States ---
-            lastX2 = gamepad2.x;
-            previousDpadDown = gamepad2.dpad_down;
-            previousDpadUp = gamepad2.dpad_up;
+            lastX = mechGP.x;
+            previousDpadDown = mechGP.dpad_down;
+            previousDpadUp = mechGP.dpad_up;
             lastB = gamepad1.b;
-            previousY2 = gamepad2.y; // BUG FIX: Use gamepad2.y
+            previousY = mechGP.y;
 
             // --- Final Telemetry Update ---
+            telemetry.addData("Controller Mode", isDualMode ? "Dual" : "Single");
             telemetry.addData("Limelight Targeting Toggle (G1 B)", bToggle);
-            telemetry.addData("Auto Speed Toggle (G2 X)", xToggle);
+            telemetry.addData("Auto Speed Toggle (X)", xToggle);
             telemetry.addData("Shooter Speed (Limelight)", getMotorSpeed(ta));
             telemetry.update();
         }
