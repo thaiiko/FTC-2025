@@ -1,0 +1,713 @@
+\documentclass[11pt,a4paper]{article}
+
+% ============================================
+% PACKAGES
+% ============================================
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{siunitx}
+\DeclareSIUnit{\foot}{ft}
+\DeclareSIUnit{\feet}{ft}
+\DeclareSIUnit{\inch}{in}
+\let\degree\relax
+\DeclareSIUnit{\degree}{^\circ}
+\newcommand{\degree}{^\circ}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\geometry{margin=1in}
+
+% Custom colors
+\definecolor{tunedvalue}{RGB}{0, 100, 180}
+\definecolor{derivation}{RGB}{50, 50, 50}
+
+% Custom environments
+\newtcolorbox{tunedbox}[1][]{
+    colback=blue!5!white,
+    colframe=blue!75!black,
+    title={Tuned Values},
+    #1
+}
+
+\newtcolorbox{algorithmbox}[1][]{
+    colback=gray!5!white,
+    colframe=gray!75!black,
+    title={Algorithm},
+    #1
+}
+
+% ============================================
+% DOCUMENT INFO
+% ============================================
+\title{Control Systems and Algorithms\\
+\large BaseBot FTC Robot - Technical Reference}
+\author{Team Documentation}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ============================================
+% SECTION 1: BALLISTIC SOLVER
+% ============================================
+\section{Ballistic Solver Algorithm}
+
+The ballistic solver computes the required launch velocity for a projectile to reach a target at a known distance and height, given a fixed launch angle.
+
+\subsection{Problem Setup}
+
+We model the projectile as a point mass under constant gravitational acceleration, neglecting air resistance. The launcher is positioned at the origin with:
+
+\begin{itemize}
+    \item Fixed launch angle $\theta$ above horizontal
+    \item Target at horizontal distance $x$ (feet)
+    \item Target at vertical height $y$ above the launcher (feet)
+    \item Gravitational acceleration $g = \SI{32.2}{\foot\per\second\squared}$
+\end{itemize}
+
+\subsection{Derivation of Launch Velocity}
+
+\subsubsection{Equations of Motion}
+
+The position of the projectile at time $t$ is given by the kinematic equations:
+
+\begin{align}
+    x(t) &= v_0 \cos(\theta) \cdot t \label{eq:x_motion} \\
+    y(t) &= v_0 \sin(\theta) \cdot t - \frac{1}{2}g t^2 \label{eq:y_motion}
+\end{align}
+
+where $v_0$ is the initial launch velocity (magnitude).
+
+\subsubsection{Eliminating Time}
+
+From equation \eqref{eq:x_motion}, we solve for time:
+
+\begin{equation}
+    t = \frac{x}{v_0 \cos(\theta)} \label{eq:time}
+\end{equation}
+
+Substituting \eqref{eq:time} into \eqref{eq:y_motion}:
+
+\begin{align}
+    y &= v_0 \sin(\theta) \cdot \frac{x}{v_0 \cos(\theta)} - \frac{1}{2}g \left(\frac{x}{v_0 \cos(\theta)}\right)^2 \\[1em]
+    y &= x \tan(\theta) - \frac{g x^2}{2 v_0^2 \cos^2(\theta)} \label{eq:trajectory}
+\end{align}
+
+Equation \eqref{eq:trajectory} is the \textbf{trajectory equation} relating the position $(x, y)$ to the launch parameters.
+
+\subsubsection{Solving for Launch Velocity}
+
+Rearranging equation \eqref{eq:trajectory} to isolate $v_0^2$:
+
+\begin{align}
+    y &= x \tan(\theta) - \frac{g x^2}{2 v_0^2 \cos^2(\theta)} \\[0.5em]
+    \frac{g x^2}{2 v_0^2 \cos^2(\theta)} &= x \tan(\theta) - y \\[0.5em]
+    v_0^2 &= \frac{g x^2}{2 \cos^2(\theta) \left( x \tan(\theta) - y \right)}
+\end{align}
+
+Taking the positive square root (physical solution):
+
+\begin{equation}
+    \boxed{v_0 = \sqrt{\frac{g x^2}{2 \cos^2(\theta) \left( x \tan(\theta) - y \right)}}}
+    \label{eq:launch_velocity}
+\end{equation}
+
+\subsubsection{Validity Conditions}
+
+The solution is valid when the denominator is positive:
+
+\begin{equation}
+    x \tan(\theta) - y > 0 \quad \Rightarrow \quad x \tan(\theta) > y
+\end{equation}
+
+This means the target must be \textit{below} the line defined by the launch angle. If this condition is not met, the target is unreachable at the given angle.
+
+\subsection{Conversion to Motor RPM}
+
+The launch velocity must be converted to motor RPM for the shooter wheels.
+
+\subsubsection{Surface Velocity Relationship}
+
+For a wheel of diameter $d$, the surface velocity $v$ relates to angular velocity $\omega$ by:
+
+\begin{equation}
+    v = \frac{\omega \cdot d}{2} = \frac{\pi d \cdot n}{60}
+\end{equation}
+
+where $n$ is the rotational speed in RPM. Solving for $n$:
+
+\begin{equation}
+    n = \frac{60 \cdot v}{\pi d} = \frac{v}{\pi d} \cdot 60
+\end{equation}
+
+\subsubsection{Empirical Correction Factor}
+
+Due to ball compression, slip, and other real-world effects, we apply an empirical correction factor $k_{\text{emp}}$:
+
+\begin{equation}
+    n_{\text{motor}} = \frac{k_{\text{magic}} \cdot v_0}{\pi \cdot d_{\text{wheel}}} \cdot k_{\text{emp}}
+    \label{eq:motor_rpm}
+\end{equation}
+
+where $k_{\text{magic}}$ is a gearing/conversion constant.
+
+\subsubsection{Conversion to Encoder Ticks}
+
+The motor velocity in ticks per second is:
+
+\begin{equation}
+    \dot{\theta}_{\text{ticks}} = n_{\text{motor}} \cdot \frac{T_{\text{rev}}}{60}
+    \label{eq:motor_velocity_ticks}
+\end{equation}
+
+where $T_{\text{rev}}$ is the encoder ticks per revolution:
+
+\begin{equation}
+    T_{\text{rev}} = C_{\text{motor}} \cdot G_r
+\end{equation}
+
+with $C_{\text{motor}}$ being the counts per motor revolution and $G_r$ the gear ratio.
+
+\subsection{Tuned Parameter Values}
+
+\begin{tunedbox}
+\begin{align}
+    \theta &= \SI{48}{\degree} = \SI{0.838}{\radian} \tag{Launch Angle} \\[0.5em]
+    y_{\text{target}} &= \SI{3.875}{\foot} \tag{Target Height} \\[0.5em]
+    g &= \SI{32.2}{\foot\per\second\squared} \tag{Gravity} \\[0.5em]
+    d_{\text{wheel}} &= \SI{0.315}{\foot} \tag{Shooter Wheel Diameter} \\[0.5em]
+    k_{\text{emp}} &= 1.2 \tag{Empirical Factor} \\[0.5em]
+    k_{\text{magic}} &= 120.0 \tag{Gearing Constant} \\[0.5em]
+    C_{\text{motor}} &= 28 \tag{Counts per Motor Rev} \\[0.5em]
+    G_r &= \frac{30}{24} = 1.25 \tag{Gear Ratio} \\[0.5em]
+    T_{\text{rev}} &= 28 \times 1.25 = 35 \tag{Ticks per Rev}
+\end{align}
+\end{tunedbox}
+
+\subsection{Complete Algorithm}
+
+\begin{algorithmbox}
+\begin{algorithmic}[1]
+\Require Robot pose $(x_r, y_r)$, Tower position $(x_t, y_t)$
+\Ensure Motor velocity in ticks/second
+
+\State \textbf{Step 1:} Compute distance to target
+\[
+    x_{\text{dist}} = \frac{\sqrt{(x_r - x_t)^2 + (y_r - y_t)^2}}{12} \quad \text{(convert inches to feet)}
+\]
+
+\State \textbf{Step 2:} Compute required launch velocity
+\[
+    v_0 = \sqrt{\frac{g \cdot x_{\text{dist}}^2}{2 \cos^2(\theta) \left( x_{\text{dist}} \tan(\theta) - y_{\text{target}} \right)}}
+\]
+
+\State \textbf{Step 3:} Convert to motor RPM
+\[
+    n_{\text{motor}} = \frac{k_{\text{magic}} \cdot v_0}{\pi \cdot d_{\text{wheel}}} \cdot k_{\text{emp}}
+\]
+
+\State \textbf{Step 4:} Convert to ticks per second
+\[
+    \dot{\theta}_{\text{ticks}} = n_{\text{motor}} \cdot \frac{T_{\text{rev}}}{60}
+\]
+
+\State \Return $\dot{\theta}_{\text{ticks}}$
+\end{algorithmic}
+\end{algorithmbox}
+
+% ============================================
+% SECTION 2: LIMELIGHT TARGETING
+% ============================================
+\newpage
+\section{Limelight Targeting System}
+
+The Limelight vision system provides target tracking data used for both steering assistance and shooter speed estimation.
+
+\subsection{Limelight Output Variables}
+
+The Limelight camera provides:
+
+\begin{itemize}
+    \item $t_x$: Horizontal offset from crosshair to target (degrees, range $\pm 27.25\degree$)
+    \item $t_y$: Vertical offset from crosshair to target (degrees)
+    \item $t_a$: Target area as percentage of image (0--100\%)
+\end{itemize}
+
+\subsection{Steering Assist Algorithm}
+
+The steering assist modifies the robot's rotational velocity to center the target in the camera's field of view.
+
+\subsubsection{Proportional Control}
+
+The rotation modifier is computed as a proportional controller:
+
+\begin{equation}
+    r_{\text{mod}} = \frac{t_x}{t_{x,\max}} \cdot k_{\text{steer}}
+    \label{eq:rx_modifier}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $t_{x,\max} = 27.25\degree$ is the maximum horizontal FOV
+    \item $k_{\text{steer}}$ is the steering gain coefficient
+\end{itemize}
+
+\subsubsection{Combined Rotation Command}
+
+The total rotation command combines driver input with vision assist:
+
+\begin{equation}
+    \omega_{\text{total}} = \omega_{\text{driver}} + r_{\text{mod}}
+    \label{eq:total_rotation}
+\end{equation}
+
+where:
+
+\begin{equation}
+    \omega_{\text{driver}} = -\text{right\_stick}_x \cdot k_{\text{turn}}
+\end{equation}
+
+\subsection{Tuned Parameter Values}
+
+\begin{tunedbox}
+\begin{align}
+    t_{x,\max} &= 27.25\degree \tag{Max Horizontal FOV} \\[0.5em]
+    k_{\text{steer}} &= \begin{cases}
+        0.8 & \text{(Single Driver Mode)} \\
+        0.4 & \text{(Dual Driver Mode)}
+    \end{cases} \tag{Steering Gain} \\[0.5em]
+    k_{\text{turn}} &= 0.6 \tag{Base Turn Speed Multiplier}
+\end{align}
+\end{tunedbox}
+
+\subsection{Empirical Motor Speed from Target Area}
+
+An alternative (fallback) method estimates shooter speed directly from target area using an empirical exponential curve fit.
+
+\subsubsection{Exponential Model}
+
+The relationship between target area and motor speed follows:
+
+\begin{equation}
+    v_{\text{motor}}(t_a) = A \cdot e^{B \cdot t_a} + C
+    \label{eq:motor_speed_empirical}
+\end{equation}
+
+This models the inverse relationship between apparent target size and distance---larger targets are closer and require less shooter power.
+
+\subsubsection{Derivation of Exponential Fit}
+
+The exponential form arises from the relationship between target area and distance:
+
+\begin{equation}
+    t_a \propto \frac{1}{d^2}
+\end{equation}
+
+Combined with the ballistic velocity requirement (which increases with distance), an exponential decay in motor speed versus target area is expected.
+
+\subsection{Tuned Empirical Curve Parameters}
+
+\begin{tunedbox}
+\begin{align}
+    A &= 0.2273 \tag{Amplitude} \\[0.5em]
+    B &= -0.8680 \tag{Decay Rate} \\[0.5em]
+    C &= 0.49 \tag{Offset/Baseline}
+\end{align}
+
+The complete empirical formula:
+\begin{equation}
+    \boxed{v_{\text{motor}}(t_a) = 0.2273 \cdot e^{-0.868 \cdot t_a} + 0.49}
+\end{equation}
+\end{tunedbox}
+
+% ============================================
+% SECTION 3: PID/PIDF CONTROLLERS
+% ============================================
+\newpage
+\section{PID and PIDF Control Theory}
+
+This section provides background on PID control theory before discussing RoadRunner's specific implementation.
+
+\subsection{General PID Controller}
+
+A \textbf{Proportional-Integral-Derivative (PID)} controller computes a control signal based on the error between a desired setpoint and measured process variable.
+
+\subsubsection{Error Definition}
+
+\begin{equation}
+    e(t) = r(t) - y(t)
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $r(t)$ is the reference (setpoint)
+    \item $y(t)$ is the measured output
+    \item $e(t)$ is the error
+\end{itemize}
+
+\subsubsection{PID Control Law}
+
+The continuous-time PID control signal is:
+
+\begin{equation}
+    u(t) = K_p e(t) + K_i \int_0^t e(\tau) \, d\tau + K_d \frac{de(t)}{dt}
+    \label{eq:pid_continuous}
+\end{equation}
+
+\subsubsection{Component Analysis}
+
+\begin{enumerate}
+    \item \textbf{Proportional (P):} $K_p e(t)$
+    \begin{itemize}
+        \item Provides immediate response proportional to current error
+        \item Higher $K_p$ increases response speed but may cause overshoot
+        \item Cannot eliminate steady-state error alone
+    \end{itemize}
+    
+    \item \textbf{Integral (I):} $K_i \int_0^t e(\tau) \, d\tau$
+    \begin{itemize}
+        \item Accumulates past errors over time
+        \item Eliminates steady-state error
+        \item Can cause overshoot and oscillation if too high
+        \item Susceptible to ``integral windup''
+    \end{itemize}
+    
+    \item \textbf{Derivative (D):} $K_d \frac{de(t)}{dt}$
+    \begin{itemize}
+        \item Responds to rate of change of error
+        \item Provides damping, reducing overshoot
+        \item Sensitive to noise in measurements
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Discrete-Time Implementation}
+
+For digital systems with sample period $\Delta t$:
+
+\begin{equation}
+    u[k] = K_p e[k] + K_i \Delta t \sum_{j=0}^{k} e[j] + K_d \frac{e[k] - e[k-1]}{\Delta t}
+    \label{eq:pid_discrete}
+\end{equation}
+
+\subsection{PIDF Controller (Feedforward Extension)}
+
+A \textbf{PIDF controller} adds a feedforward term to the standard PID:
+
+\begin{equation}
+    u(t) = \underbrace{K_p e(t) + K_i \int e \, dt + K_d \frac{de}{dt}}_{\text{Feedback (PID)}} + \underbrace{K_f \cdot r(t)}_{\text{Feedforward}}
+    \label{eq:pidf}
+\end{equation}
+
+The feedforward term $K_f \cdot r(t)$ provides an open-loop estimate of the required control effort, reducing the burden on the feedback loop.
+
+\subsection{Feedforward Control}
+
+Feedforward control predicts the required control effort based on system dynamics, without waiting for error to accumulate.
+
+\subsubsection{Velocity-Based Feedforward}
+
+For motor control, a common feedforward model is:
+
+\begin{equation}
+    u_{\text{ff}} = k_S \cdot \text{sign}(v) + k_V \cdot v + k_A \cdot a
+    \label{eq:feedforward_motor}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $k_S$: Static friction compensation (minimum power to move)
+    \item $k_V$: Velocity feedforward gain (power per unit velocity)
+    \item $k_A$: Acceleration feedforward gain (power per unit acceleration)
+    \item $v$: Desired velocity
+    \item $a$: Desired acceleration
+\end{itemize}
+
+\subsubsection{Physical Interpretation}
+
+\begin{enumerate}
+    \item \textbf{Static Friction ($k_S$):} Overcomes stiction---the motor requires a minimum voltage to begin moving.
+    
+    \item \textbf{Velocity ($k_V$):} Counteracts back-EMF and viscous friction, both proportional to velocity.
+    
+    \item \textbf{Acceleration ($k_A$):} Provides torque for changing velocity (Newton's second law: $F = ma$).
+\end{enumerate}
+
+\subsection{Feedforward + Feedback Architecture}
+
+Modern motion control combines feedforward with feedback:
+
+\begin{equation}
+    u_{\text{total}} = u_{\text{ff}}(v_{\text{ref}}, a_{\text{ref}}) + u_{\text{fb}}(e_{\text{pos}}, e_{\text{vel}})
+    \label{eq:ff_fb_combined}
+\end{equation}
+
+\begin{itemize}
+    \item Feedforward handles the \textit{expected} dynamics
+    \item Feedback corrects for \textit{disturbances} and \textit{model errors}
+\end{itemize}
+
+This architecture provides faster response than pure feedback control.
+
+% ============================================
+% SECTION 4: ROADRUNNER IMPLEMENTATION
+% ============================================
+\newpage
+\section{RoadRunner Control Implementation}
+
+RoadRunner uses a feedforward + proportional feedback architecture for trajectory following on mecanum and tank drive robots.
+
+\subsection{System Architecture}
+
+\begin{enumerate}
+    \item \textbf{Trajectory Generation:} Creates time-parameterized paths with position, velocity, and acceleration profiles
+    \item \textbf{Holonomic Controller:} Computes velocity corrections based on pose error
+    \item \textbf{Inverse Kinematics:} Converts robot velocity to individual wheel velocities
+    \item \textbf{Motor Feedforward:} Computes motor power from wheel velocity commands
+    \item \textbf{Voltage Compensation:} Normalizes for battery voltage variation
+\end{enumerate}
+
+\subsection{Motor Feedforward}
+
+RoadRunner uses the velocity-based feedforward model:
+
+\begin{equation}
+    \boxed{P_{\text{motor}} = \frac{k_S \cdot \text{sign}(v) + k_V \cdot v + k_A \cdot a}{V_{\text{battery}}}}
+    \label{eq:rr_feedforward}
+\end{equation}
+
+\subsubsection{Tuned Feedforward Parameters}
+
+\begin{tunedbox}
+\begin{align}
+    k_S &= 0.7277143118850069 \tag{Static Friction} \\[0.5em]
+    k_V &= 0.0005548815688021238 \tag{Velocity Gain (tick units)} \\[0.5em]
+    k_A &= 0.000055 \tag{Acceleration Gain (tick units)}
+\end{align}
+
+Note: $k_V$ and $k_A$ are internally converted using \texttt{inPerTick}:
+\begin{align}
+    k_V^{\prime} &= \frac{k_V}{\text{inPerTick}} \\[0.5em]
+    k_A^{\prime} &= \frac{k_A}{\text{inPerTick}}
+\end{align}
+\end{tunedbox}
+
+\subsection{Holonomic Position Controller}
+
+For mecanum drives, RoadRunner uses a \textbf{Holonomic Controller} that applies proportional feedback independently to each degree of freedom.
+
+\subsubsection{Pose Error}
+
+The pose error between target and actual pose:
+
+\begin{align}
+    e_x &= x_{\text{target}} - x_{\text{actual}} \tag{Axial Error} \\
+    e_y &= y_{\text{target}} - y_{\text{actual}} \tag{Lateral Error} \\
+    e_\theta &= \theta_{\text{target}} - \theta_{\text{actual}} \tag{Heading Error}
+\end{align}
+
+\subsubsection{Velocity Error (Optional)}
+
+\begin{align}
+    e_{\dot{x}} &= \dot{x}_{\text{target}} - \dot{x}_{\text{actual}} \\
+    e_{\dot{y}} &= \dot{y}_{\text{target}} - \dot{y}_{\text{actual}} \\
+    e_{\dot{\theta}} &= \dot{\theta}_{\text{target}} - \dot{\theta}_{\text{actual}}
+\end{align}
+
+\subsubsection{Control Law}
+
+The velocity correction command is:
+
+\begin{equation}
+    \begin{bmatrix} v_x \\ v_y \\ \omega \end{bmatrix}_{\text{correction}} = 
+    \begin{bmatrix} 
+        K_{\text{axial}} & 0 & 0 \\
+        0 & K_{\text{lateral}} & 0 \\
+        0 & 0 & K_{\text{heading}}
+    \end{bmatrix}
+    \begin{bmatrix} e_x \\ e_y \\ e_\theta \end{bmatrix}
+    +
+    \begin{bmatrix} 
+        K_{\text{axialVel}} & 0 & 0 \\
+        0 & K_{\text{lateralVel}} & 0 \\
+        0 & 0 & K_{\text{headingVel}}
+    \end{bmatrix}
+    \begin{bmatrix} e_{\dot{x}} \\ e_{\dot{y}} \\ e_{\dot{\theta}} \end{bmatrix}
+    \label{eq:holonomic_control}
+\end{equation}
+
+This is equivalent to three independent PD controllers (or P controllers if velocity gains are zero).
+
+\subsubsection{Tuned Controller Gains}
+
+\begin{tunedbox}
+\textbf{Position Gains (Proportional):}
+\begin{align}
+    K_{\text{axial}} &= 5.0 \tag{Forward/Backward} \\[0.5em]
+    K_{\text{lateral}} &= 7.0 \tag{Left/Right} \\[0.5em]
+    K_{\text{heading}} &= 6.0 \tag{Rotation}
+\end{align}
+
+\textbf{Velocity Gains (Derivative):}
+\begin{align}
+    K_{\text{axialVel}} &= 0.0 \\[0.5em]
+    K_{\text{lateralVel}} &= 0.0 \\[0.5em]
+    K_{\text{headingVel}} &= 0.0
+\end{align}
+
+Note: Velocity gains are set to zero, making this a pure proportional controller.
+\end{tunedbox}
+
+\subsection{Mecanum Inverse Kinematics}
+
+The robot velocity command is converted to individual wheel velocities:
+
+\begin{equation}
+    \begin{bmatrix} v_{FL} \\ v_{BL} \\ v_{BR} \\ v_{FR} \end{bmatrix} = 
+    \begin{bmatrix}
+        1 & -1 & -w \\
+        1 & 1 & -w \\
+        1 & -1 & w \\
+        1 & 1 & w
+    \end{bmatrix}
+    \begin{bmatrix} v_x \\ v_y \\ \omega \end{bmatrix}
+    \label{eq:mecanum_ik}
+\end{equation}
+
+where $w$ is related to the track width and wheelbase geometry.
+
+\subsection{Motion Profile Constraints}
+
+Trajectories are generated respecting kinematic limits:
+
+\begin{tunedbox}
+\begin{align}
+    v_{\text{max,wheel}} &= \SI{50}{\inch\per\second} \tag{Max Wheel Velocity} \\[0.5em]
+    a_{\text{min}} &= \SI{-30}{\inch\per\second\squared} \tag{Max Deceleration} \\[0.5em]
+    a_{\text{max}} &= \SI{50}{\inch\per\second\squared} \tag{Max Acceleration} \\[0.5em]
+    \omega_{\text{max}} &= \pi \; \si{\radian\per\second} \tag{Max Angular Velocity} \\[0.5em]
+    \alpha_{\text{max}} &= \pi \; \si{\radian\per\second\squared} \tag{Max Angular Acceleration}
+\end{align}
+\end{tunedbox}
+
+\subsection{Drive Model Parameters}
+
+\begin{tunedbox}
+\begin{align}
+    \text{inPerTick} &= 0.002958762251124946 \tag{Inches per Encoder Tick} \\[0.5em]
+    \text{lateralInPerTick} &= 0.00237698919596079 \tag{Lateral Inches per Tick} \\[0.5em]
+    \text{trackWidthTicks} &= 3651.249759136032 \tag{Track Width in Ticks}
+\end{align}
+\end{tunedbox}
+
+\subsection{Localization: Two Dead Wheel Odometry}
+
+The robot uses two ``dead wheel'' encoders (passive wheels that roll along the ground) for position tracking:
+
+\begin{tunedbox}
+\begin{align}
+    \text{parYTicks} &= -953.3323765076996 \tag{Parallel Encoder Y Position} \\[0.5em]
+    \text{perpXTicks} &= -580.0203235462603 \tag{Perpendicular Encoder X Position}
+\end{align}
+
+These values represent the encoder positions relative to the robot center, in encoder tick units.
+\end{tunedbox}
+
+\subsection{Complete Control Loop}
+
+\begin{algorithmbox}[title={RoadRunner Control Loop (per cycle)}]
+\begin{algorithmic}[1]
+\Require Trajectory $\tau(t)$, current time $t$, battery voltage $V$
+\Ensure Motor powers $P_{FL}, P_{BL}, P_{BR}, P_{FR}$
+
+\State \textbf{Step 1:} Get target pose and velocities from trajectory
+\[
+    (x_t, y_t, \theta_t), (\dot{x}_t, \dot{y}_t, \dot{\theta}_t), (\ddot{x}_t, \ddot{y}_t, \ddot{\theta}_t) \gets \tau(t)
+\]
+
+\State \textbf{Step 2:} Get current pose from localizer
+\[
+    (x_c, y_c, \theta_c) \gets \text{localizer.getPose()}
+\]
+
+\State \textbf{Step 3:} Compute pose error
+\[
+    \mathbf{e} = (x_t - x_c, \; y_t - y_c, \; \theta_t - \theta_c)
+\]
+
+\State \textbf{Step 4:} Apply holonomic controller
+\[
+    \mathbf{v}_{\text{cmd}} = \mathbf{v}_{\text{target}} + K \cdot \mathbf{e}
+\]
+
+\State \textbf{Step 5:} Inverse kinematics to wheel velocities
+\[
+    (v_{FL}, v_{BL}, v_{BR}, v_{FR}) \gets \text{MecanumKinematics.inverse}(\mathbf{v}_{\text{cmd}})
+\]
+
+\State \textbf{Step 6:} Compute motor powers via feedforward
+\For{each wheel $i$}
+    \[
+        P_i = \frac{k_S \cdot \text{sign}(v_i) + k_V \cdot v_i + k_A \cdot a_i}{V}
+    \]
+\EndFor
+
+\State \Return $(P_{FL}, P_{BL}, P_{BR}, P_{FR})$
+\end{algorithmic}
+\end{algorithmbox}
+
+% ============================================
+% APPENDIX
+% ============================================
+\newpage
+\appendix
+\section{Symbol Reference}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Symbol} & \textbf{Description} & \textbf{Units} \\
+\midrule
+$v_0$ & Launch velocity & ft/s \\
+$\theta$ & Launch angle & radians \\
+$g$ & Gravitational acceleration & ft/s$^2$ \\
+$x$ & Horizontal distance to target & ft \\
+$y$ & Vertical height of target & ft \\
+$t_x, t_y, t_a$ & Limelight outputs & degrees, degrees, \% \\
+$K_p, K_i, K_d$ & PID gains & varies \\
+$k_S, k_V, k_A$ & Feedforward coefficients & power units \\
+$e(t)$ & Error signal & varies \\
+$u(t)$ & Control signal & varies \\
+\bottomrule
+\end{tabular}
+\caption{Symbol definitions}
+\end{table}
+
+\section{Tuning Procedures}
+
+\subsection{Feedforward Tuning}
+
+\begin{enumerate}
+    \item Run \texttt{ForwardRampLogger} to collect velocity vs. power data
+    \item Fit linear regression: $P = k_S \cdot \text{sign}(v) + k_V \cdot v$
+    \item Run acceleration tests to determine $k_A$
+\end{enumerate}
+
+\subsection{Feedback Tuning}
+
+\begin{enumerate}
+    \item Start with low gains: $K_{\text{axial}} = K_{\text{lateral}} = K_{\text{heading}} = 1.0$
+    \item Increase gains until oscillation begins
+    \item Back off by 20--30\%
+    \item Add velocity gains if needed for damping
+\end{enumerate}
+
+\end{document}

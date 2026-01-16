@@ -1,7 +1,10 @@
 package org.firstinspires.ftc.teamcode;
 
+import com.acmerobotics.roadrunner.Pose2d;
+
 public class RobotState {
     static int ballsIn = 3;
+    static Pose2d currentPose = new Pose2d(0, 0, 180);
 
     public static void setBallsIn(int balls) {
         if (balls < 0) {
@@ -11,6 +14,12 @@ public class RobotState {
         }
         ballsIn = balls;
     }
+    public static void setCurrentPose(Pose2d pose) {
+        currentPose = pose;
+    }
+    public static Pose2d getCurrentPose() {
+        return currentPose;
+    }
     public static int getBallsIn() {
         return ballsIn;
     }
@@ -18,15 +27,15 @@ public class RobotState {
         setBallsIn(3);
         switch (balls) {
             case 0:
-                return -37;
+                return 58;
             case 1:
-                return -32;
+                return 52;
             case 2:
-                return -27;
+                return 48;
             case 3:
-                return -24;
+                return 31;
             default:
-                return -38;
+                return 58;
         }
     }
 }

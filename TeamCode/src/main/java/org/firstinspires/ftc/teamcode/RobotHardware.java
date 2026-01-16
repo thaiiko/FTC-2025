@@ -128,7 +128,7 @@ public class RobotHardware extends MecanumDrive {
         @Override
         public boolean run(@NotNull TelemetryPacket packet) {
             if (!initalized) {
-                intake.setPower(1);
+                intake.setPower(0.8);
                 initalized = true;
             }
 
@@ -214,6 +214,7 @@ public class RobotHardware extends MecanumDrive {
                     intake.setPower(0);
                     light1.setPosition(0);
                     RobotState.setBallsIn(0);
+                    lShooter.setVelocity(velocityTarget - 600);
                     return false;
                 }
 
@@ -224,6 +225,7 @@ public class RobotHardware extends MecanumDrive {
                     index.setPower(0);
                     intake.setPower(0);
                     light1.setPosition(0);
+                    lShooter.setVelocity(velocityTarget - 600);
                     RobotState.setBallsIn(ballsRemaining);
                     return false;
                 }

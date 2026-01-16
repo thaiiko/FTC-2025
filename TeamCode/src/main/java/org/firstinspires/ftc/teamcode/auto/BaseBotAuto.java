@@ -102,13 +102,13 @@ public class BaseBotAuto extends LinearOpMode {
         sideMultiplier = alliance.getValue();
 
         if (sideMultiplier == -1) {
-            facingGate = 269;
+            facingGate = 270;
         } else if (sideMultiplier == 1) {
-            facingGate = 89;
+            facingGate = 90;
         }
 
-        PPG = new Pose2d(new Vector2d(40, 29 * sideMultiplier), Math.toRadians(facingGate));
-        PGP = new Pose2d(new Vector2d(13, 29 * sideMultiplier), Math.toRadians(facingGate));
+        PPG = new Pose2d(new Vector2d(37, 29 * sideMultiplier), Math.toRadians(facingGate));
+        PGP = new Pose2d(new Vector2d(12, 29 * sideMultiplier), Math.toRadians(facingGate));
         GPP = new Pose2d(new Vector2d(-10.5, 29 * sideMultiplier), Math.toRadians(facingGate));
         farShot = new Pose2d(new Vector2d(60, 7.125 * sideMultiplier), Math.toRadians(200));
         closeShot = new Pose2d(new Vector2d(-10, 10 * sideMultiplier), Math.toRadians(225));
@@ -118,21 +118,28 @@ public class BaseBotAuto extends LinearOpMode {
         Pose2d targetShot = close ? closeShot : farShot;
         Pose2d lastIntake;
 
-        LLResult result = robot.limelight.getLatestResult();
         int fiducialId = 0;
-        if (result.getFiducialResults().get(0) != null) {
-            fiducialId = result.getFiducialResults().get(0).getFiducialId();
+        LLResult result = robot.limelight.getLatestResult();
+        if (result != null) {
+
+            if (result.getFiducialResults() != null) {
+                fiducialId = result.getFiducialResults().get(0).getFiducialId();
+            }
         }
 
         switch (fiducialId) {
             case 21:
                 lastIntake = GPP;
+                break;
             case 22:
                 lastIntake = PGP;
+                break;
             case 23:
                 lastIntake = PPG;
+                break;
             default:
                 lastIntake = close ? GPP : PPG;
+                break;
         }
 
         // press start
@@ -147,6 +154,7 @@ public class BaseBotAuto extends LinearOpMode {
                             .strafeToSplineHeading(new Vector2d(42, 7.125 * sideMultiplier), Math.toRadians(180))
                             .build()
             );
+            RobotState.setCurrentPose(robot.localizer.getPose());
             stop();
             return;
         }
@@ -161,6 +169,7 @@ public class BaseBotAuto extends LinearOpMode {
                         .strafeToSplineHeading(targetShot.position, targetShot.heading)
                         .build()
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
 
 
         // shoot and autoalign
@@ -171,11 +180,14 @@ public class BaseBotAuto extends LinearOpMode {
                 ),
                 robot.shootBall(3, 1100)
         ));
+//        robot.lShooter.setPower(0);
+//        robot.rShooter.setPower(0);
         telemetry.addData("Balls", RobotState.getBallsIn());
         telemetry.update();
 
         if (cycles == 1) {
             stop();
+            RobotState.setCurrentPose(robot.localizer.getPose());
             return;
         }
 
@@ -184,12 +196,13 @@ public class BaseBotAuto extends LinearOpMode {
                 robot.actionBuilder(robot.localizer.getPose())
                         .strafeToSplineHeading(
                                 PPG.position,
-                                PPG.heading,
-                                new TranslationalVelConstraint(15.0),
-                                new ProfileAccelConstraint(-15.0, 40.0)
+                                PPG.heading
+//                                new TranslationalVelConstraint(20.0),
+//                                new ProfileAccelConstraint(-15.0, 50.0)
                         )
                         .build()
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
 
         Actions.runBlocking(
                 robot.startIntake()
@@ -199,13 +212,14 @@ public class BaseBotAuto extends LinearOpMode {
         Actions.runBlocking(
                 robot.actionBuilder(robot.localizer.getPose())
                         .strafeToSplineHeading(
-                                new Vector2d(PPG.position.x, RobotState.getY(RobotState.getBallsIn())),
-                                Math.toRadians(269),
-                                new TranslationalVelConstraint(15.0),
-                                new ProfileAccelConstraint(-15.0, 40.0)
+                                new Vector2d(PPG.position.x, (sideMultiplier * RobotState.getY(/* RobotState.getBallsIn() */ 0))),
+                                Math.toRadians(facingGate),
+                                new TranslationalVelConstraint(32.0),
+                                new ProfileAccelConstraint(-15.0, 50.0)
                         )
                         .build()
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
 
         // run back to the back shooting area.
         Actions.runBlocking(
@@ -217,16 +231,21 @@ public class BaseBotAuto extends LinearOpMode {
         // shoot #2
         Actions.runBlocking(
                 new SequentialAction(
-                        robot.startIntake(),
+                        new ParallelAction(
+                            robot.spinUpShooter(1100),
+                            robot.autoalign()
+                        ),
                         robot.shootBall(3, 1100)
                 )
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
 
         telemetry.addData("Balls", RobotState.getBallsIn());
         telemetry.update();
 
         if (cycles == 2) {
             stop();
+            RobotState.setCurrentPose(robot.localizer.getPose());
             return;
         }
 
@@ -241,35 +260,42 @@ public class BaseBotAuto extends LinearOpMode {
                         )
                         .build()
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
 
         // intake for how many balls we have (Intake segment 4)
         Actions.runBlocking(
-                robot.actionBuilder(robot.localizer.getPose())
-                        .strafeToSplineHeading(
-                                new Vector2d(PGP.position.x, RobotState.getY(RobotState.getBallsIn())),
-                                Math.toRadians(269),
-                                new TranslationalVelConstraint(15.0),
-                                new ProfileAccelConstraint(-15.0, 45.0)
-                        )
-                        .build()
+                new SequentialAction(
+                        robot.startIntake(),
+                        robot.actionBuilder(robot.localizer.getPose())
+                                .strafeToSplineHeading(
+                                        new Vector2d(PGP.position.x, (sideMultiplier * RobotState.getY(/*RobotState.getBallsIn() */ 0))),
+                                        Math.toRadians(facingGate),
+                                        new TranslationalVelConstraint(15.0),
+                                        new ProfileAccelConstraint(-15.0, 45.0)
+                                )
+                                .build()
+                )
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
 
         Actions.runBlocking(
                 robot.actionBuilder(robot.localizer.getPose())
                         .strafeToSplineHeading(targetShot.position, targetShot.heading)
                         .build()
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
 
 
         Actions.runBlocking(
                 new SequentialAction(
                         new ParallelAction(
-                            robot.startIntake(),
+                            robot.spinUpShooter(1100),
                             robot.autoalign()
                         ),
                         robot.shootBall(3, 1100)
                 )
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
 
         telemetry.addData("Balls", RobotState.getBallsIn());
         telemetry.update();
@@ -285,6 +311,7 @@ public class BaseBotAuto extends LinearOpMode {
                         .strafeToSplineHeading(new Vector2d(2, -58), Math.toRadians(90))
                         .build()
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
 
 /*
         Actions.runBlocking(
@@ -307,8 +334,8 @@ public class BaseBotAuto extends LinearOpMode {
                         robot.startIntake(),
                         robot.actionBuilder(robot.localizer.getPose())
                                 .strafeToSplineHeading(
-                                        new Vector2d(GPP.position.x, RobotState.getY(RobotState.getBallsIn())),
-                                        Math.toRadians(269),
+                                        new Vector2d(GPP.position.x, (sideMultiplier * RobotState.getY(/* RobotState.getBallsIn() */ 0))),
+                                        Math.toRadians(facingGate),
                                         new TranslationalVelConstraint(15.0),
                                         new ProfileAccelConstraint(-15.0, 40.0)
                                 )
@@ -316,6 +343,7 @@ public class BaseBotAuto extends LinearOpMode {
                         robot.stopIntake()
                 )
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
         telemetry.addData("Balls", RobotState.getBallsIn());
         telemetry.update();
 
@@ -324,19 +352,19 @@ public class BaseBotAuto extends LinearOpMode {
                         .strafeToSplineHeading(closeShot.position, Math.toRadians(225))
                         .build()
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
 
         Actions.runBlocking(
             new SequentialAction(
                 new ParallelAction(
-                        robot.autoalign(),
-                        robot.spinUpShooter(1100)
+                        robot.spinUpShooter(1100),
+                        robot.autoalign()
                 ),
                 robot.shootBall(3, 1100)
             )
         );
+        RobotState.setCurrentPose(robot.localizer.getPose());
         telemetry.addData("Balls", RobotState.getBallsIn());
         telemetry.update();
-
-
     }
 }
