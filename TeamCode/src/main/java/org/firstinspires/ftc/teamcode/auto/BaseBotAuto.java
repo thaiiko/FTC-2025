@@ -14,6 +14,7 @@ import com.skeletonarmy.marrow.TimerEx;
 
 import org.firstinspires.ftc.teamcode.Alliance;
 import org.firstinspires.ftc.teamcode.Pipeline;
+import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
 import org.firstinspires.ftc.teamcode.RobotHardware;
 import org.firstinspires.ftc.teamcode.RobotState;
 
@@ -46,14 +47,14 @@ public class BaseBotAuto extends LinearOpMode {
         boolean lastDpadDown = false;
         boolean lastDpadUp = false;
 
-        boolean closeChoosen = false;
+        boolean closeChosen = false;
         while (opModeInInit()) {
             if (alliance == null) {
                 telemetry.addLine("Selected Side: Press X for Blue, B for Red");
             } else {
                 telemetry.addData("Selected Side", alliance);
             }
-            if (!closeChoosen) {
+            if (!closeChosen) {
                 telemetry.addLine("Close Shot: Press A for true, B for false");
             } else {
                 telemetry.addData("Close Shot", close);
@@ -71,12 +72,12 @@ public class BaseBotAuto extends LinearOpMode {
 
             if (gamepad1.a) {
                 close = true;
-                closeChoosen = true;
+                closeChosen = true;
             }
 
             if (gamepad1.y) {
                 close = false;
-                closeChoosen = true;
+                closeChosen = true;
             }
 
             if (gamepad1.dpad_down && !lastDpadDown) {
@@ -92,10 +93,17 @@ public class BaseBotAuto extends LinearOpMode {
 
 
         }
+
         if (alliance.equals(Alliance.BLUE)) {
             robot.limelight.pipelineSwitch(Pipeline.BLUE_PIPELINE.getValue());
         } else {
             robot.limelight.pipelineSwitch(Pipeline.RED_PIPELINE.getValue());
+        }
+
+        if (alliance.equals(Alliance.BLUE)) {
+            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_1);
+        } else {
+            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_0);
         }
 
 
@@ -110,7 +118,11 @@ public class BaseBotAuto extends LinearOpMode {
         PPG = new Pose2d(new Vector2d(37, 29 * sideMultiplier), Math.toRadians(facingGate));
         PGP = new Pose2d(new Vector2d(12, 29 * sideMultiplier), Math.toRadians(facingGate));
         GPP = new Pose2d(new Vector2d(-10.5, 29 * sideMultiplier), Math.toRadians(facingGate));
-        farShot = new Pose2d(new Vector2d(60, 7.125 * sideMultiplier), Math.toRadians(200));
+        if (alliance.equals(Alliance.BLUE)) {
+            farShot = new Pose2d(new Vector2d(60, 8 * sideMultiplier), Math.toRadians(200));
+        } else {
+            farShot = new Pose2d(new Vector2d(60, 2), Math.toRadians(155));
+        }
         closeShot = new Pose2d(new Vector2d(-10, 10 * sideMultiplier), Math.toRadians(225));
         farStart = new Pose2d(new Vector2d(64.75, 7.125 * sideMultiplier), Math.toRadians(180));
         closeStart = new Pose2d(new Vector2d(-50, 50 * sideMultiplier), Math.toRadians(135));
@@ -120,27 +132,27 @@ public class BaseBotAuto extends LinearOpMode {
 
         int fiducialId = 0;
         LLResult result = robot.limelight.getLatestResult();
-        if (result != null) {
+//        if (result != null) {
+//
+//            if (result.getFiducialResults() != null) {
+//                fiducialId = result.getFiducialResults().get(0).getFiducialId();
+//            }
+//        }
 
-            if (result.getFiducialResults() != null) {
-                fiducialId = result.getFiducialResults().get(0).getFiducialId();
-            }
-        }
-
-        switch (fiducialId) {
-            case 21:
-                lastIntake = GPP;
-                break;
-            case 22:
-                lastIntake = PGP;
-                break;
-            case 23:
-                lastIntake = PPG;
-                break;
-            default:
-                lastIntake = close ? GPP : PPG;
-                break;
-        }
+//        switch (fiducialId) {
+//            case 21:
+//                lastIntake = GPP;
+//                break;
+//            case 22:
+//                lastIntake = PGP;
+//                break;
+//            case 23:
+//                lastIntake = PPG;
+//                break;
+//            default:
+//                lastIntake = close ? GPP : PPG;
+//                break;
+//        }
 
         // press start
         waitForStart();
@@ -155,6 +167,7 @@ public class BaseBotAuto extends LinearOpMode {
                             .build()
             );
             RobotState.setCurrentPose(robot.localizer.getPose());
+            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_2);
             stop();
             return;
         }
@@ -186,8 +199,9 @@ public class BaseBotAuto extends LinearOpMode {
         telemetry.update();
 
         if (cycles == 1) {
-            stop();
             RobotState.setCurrentPose(robot.localizer.getPose());
+            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_2);
+            stop();
             return;
         }
 
@@ -204,20 +218,21 @@ public class BaseBotAuto extends LinearOpMode {
         );
         RobotState.setCurrentPose(robot.localizer.getPose());
 
-        Actions.runBlocking(
-                robot.startIntake()
-        );
 
         // Intake until we take in the amount of balls we need (Intake segment 2)
         Actions.runBlocking(
-                robot.actionBuilder(robot.localizer.getPose())
-                        .strafeToSplineHeading(
-                                new Vector2d(PPG.position.x, (sideMultiplier * RobotState.getY(/* RobotState.getBallsIn() */ 0))),
-                                Math.toRadians(facingGate),
-                                new TranslationalVelConstraint(32.0),
-                                new ProfileAccelConstraint(-15.0, 50.0)
-                        )
-                        .build()
+                new SequentialAction(
+                        robot.startIntake(),
+                        robot.actionBuilder(robot.localizer.getPose())
+                                .strafeToSplineHeading(
+                                        new Vector2d(PPG.position.x, (sideMultiplier * RobotState.getY(/* RobotState.getBallsIn() */ 0))),
+                                        Math.toRadians(facingGate),
+                                        new TranslationalVelConstraint(32.0),
+                                        new ProfileAccelConstraint(-15.0, 50.0)
+                                )
+                                .build()
+
+                )
         );
         RobotState.setCurrentPose(robot.localizer.getPose());
 
@@ -244,6 +259,7 @@ public class BaseBotAuto extends LinearOpMode {
         telemetry.update();
 
         if (cycles == 2) {
+            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_2);
             stop();
             RobotState.setCurrentPose(robot.localizer.getPose());
             return;
@@ -301,6 +317,7 @@ public class BaseBotAuto extends LinearOpMode {
         telemetry.update();
 
         if (cycles == 3) {
+            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_2);
             stop();
             return;
         }

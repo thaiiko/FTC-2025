@@ -24,8 +24,8 @@ public class RobotState {
         return ballsIn;
     }
     public static double getY(int balls) {
-        setBallsIn(3);
-        switch (balls) {
+        setBallsIn(balls);
+        switch (ballsIn) {
             case 0:
                 return 58;
             case 1:

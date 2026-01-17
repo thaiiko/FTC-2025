@@ -80,8 +80,8 @@ public class RobotHardware extends MecanumDrive {
 
         lShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         rShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        lShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
-        rShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        lShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        rShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
         imu.initialize(
                 new IMU.Parameters(
@@ -160,13 +160,13 @@ public class RobotHardware extends MecanumDrive {
                 LLResult result = limelight.getLatestResult();
                 double tx = result.getTx();
 
-                setDrivePowers(new PoseVelocity2d(new Vector2d(0, 0), tx/27.25 * -1));
+                setDrivePowers(new PoseVelocity2d(new Vector2d(0, 0), -(tx/27.25 * 0.8)));
                 updatePoseEstimate();
 
                 light1.setPosition(.5);
                 packet.put("tx", tx);
                 packet.put("timer", timer.milliseconds());
-                if ((tx < 1.6 && tx > -1.9) || timer.milliseconds() >= 400) {
+                if ((tx < 1.6 && tx > -1.9) || timer.milliseconds() >= 500) {
                     light1.setPosition(0);
                     return false;
                 } else {
