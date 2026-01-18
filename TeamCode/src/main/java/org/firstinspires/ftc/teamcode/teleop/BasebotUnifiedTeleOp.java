@@ -16,6 +16,7 @@ import org.firstinspires.ftc.teamcode.RobotHardware;
 import org.firstinspires.ftc.teamcode.RobotState;
 
 import java.util.List;
+import java.util.Objects;
 
 
 @TeleOp(name = "BaseBot Unified Teleop")
@@ -42,6 +43,9 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
 
     // Controller mode flag: true = gamepad2 for mechanisms, false = gamepad1 for all
     boolean isDualMode = false;
+    boolean humanPlayer = false;
+    boolean debugMode = false;
+
 
     /**
      * Returns the gamepad used for mechanism controls.
@@ -50,11 +54,16 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
     private Gamepad getMechanismGamepad() {
         return isDualMode ? gamepad2 : gamepad1;
     }
+    public void addDebugTelemetry(String caption, Object value) {
+        if (debugMode) {
+            telemetry.addData(caption, value);
+        }
+    }
 
     @Override
     public void runOpMode() {
         // --- Initialization and Toggles ---
-        double shooterPower = 0.7;
+        double shooterPower = 0.6;
 
         boolean previousDpadUp = false;
         boolean previousDpadDown = false;
@@ -94,6 +103,17 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
 
         while (opModeInInit()) {
             // Controller mode selection
+            if (gamepad1.options) {
+                debugMode = !debugMode;
+                telemetry.addData("Debug Mode", debugMode ? "Enabled" : "Disabled");
+                telemetry.update();
+            }
+            if (gamepad1.left_stick_button) {
+                humanPlayer = !humanPlayer;
+                telemetry.addData("Human Player", "Enabled");
+                telemetry.update();
+            }
+
             if (!modeSelected) {
                 if (gamepad1.left_bumper) {
                     isDualMode = false;
@@ -162,8 +182,8 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             if (targetDistance <= 0 || denominator <= 0) {
                 // Denominator <= 0 means the target is too high/far for the fixed angle.
                 // Fallback to a safe closer-range shot (approx 17 ft/s) instead of 0
-                telemetry.addLine("Invalid shot geometry (too high/far for angle): using default");
-                velocity = 17.0; 
+                addDebugTelemetry("Invalid shot geometry (too high/far for angle): using default", null);
+                velocity = 17.0;
             } else {
                 velocity = Math.sqrt(numerator / denominator);
             }
@@ -173,8 +193,8 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             double motorVelocity = motorRpm * TICKS_PER_REV / 60;
 
             telemetry.addData("Current RPM", currentRpm);
-            telemetry.addData("Required Launch Velocity (ft/s)", velocity);
-            telemetry.addData("Target Distance (feet)", targetDistance);
+            addDebugTelemetry("Required Launch Velocity (ft/s)", velocity);
+            addDebugTelemetry("Target Distance (feet)", targetDistance);
             telemetry.addData("Required Motor Velocity (ticks/s)", motorVelocity);
             telemetry.addData("Launch Angle", "deg=" + LAUNCH_ANGLE_DEG);
 
@@ -197,7 +217,7 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             double rxModifier = 0.0;
             if (bToggle) {
                 // Add assist to rotation
-                rxModifier = (tx / 27.25) * (isDualMode ? 0.4 : 0.8);
+                rxModifier = -((tx / 27.25) * 0.6);
                 turn += rxModifier;
             }
 
@@ -242,9 +262,9 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
                 // D-pad Left: Intake
                 intakePower = 0.8;
                 indexPower = 0.0;
-            } else if (mechGP.y && !previousY) {
+            } else if (mechGP.y) {
                 // Gamepad Y: Index Reverse (to clear jams - momentary press)
-                indexPower = -0.5;
+                indexPower = humanPlayer ? 1.0 : 0.5;
                 intakePower = 0.0;
             }
 
@@ -291,8 +311,9 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
                     robot.rShooter.setVelocity(motorVelocity);
                 }
             } else {
-                // Ensure motors are off when not shooting
-                robot.setShooterPower(0.0);
+                // motors are off if can intake,
+                // turns it to the other direction to intake from human player
+                robot.setShooterPower(humanPlayer ? -0.3 : 0.0);
             }
 
             // --- Update Toggles/Previous States ---
@@ -300,7 +321,6 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             previousDpadDown = mechGP.dpad_down;
             previousDpadUp = mechGP.dpad_up;
             lastB = gamepad1.b;
-            previousY = mechGP.y;
 
             // --- Final Telemetry Update ---
             telemetry.addData("Controller Mode", isDualMode ? "Dual" : "Single");
