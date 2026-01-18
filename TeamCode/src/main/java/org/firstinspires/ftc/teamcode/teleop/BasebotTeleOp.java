@@ -8,6 +8,7 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.teamcode.Pipeline;
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
@@ -88,6 +89,8 @@ public class BasebotTeleOp extends LinearOpMode {
         telemetry.addData("Selected Pipeline", selectedPipeline.name());
         telemetry.addData("Status", "Initialized");
         telemetry.update();
+
+        Gamepad lastGamepad = new Gamepad();
 
         limelight.pipelineSwitch(selectedPipeline.getValue());
         waitForStart();
@@ -243,7 +246,7 @@ public class BasebotTeleOp extends LinearOpMode {
                 // D-pad Left: Intake
                 intakePower = 0.8;
                 indexPower = 0.0;
-            } else if (gamepad1.y && !previousY) {
+            } else if (gamepad1.y && !lastGamepad.y) {
                 // Gamepad Y: Index Reverse (to clear jams - momentary press)
                 indexPower = -0.5;
                 intakePower = 0.0;

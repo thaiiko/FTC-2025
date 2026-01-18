@@ -8,6 +8,7 @@ import com.qualcomm.hardware.limelightvision.LLResultTypes;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.teamcode.Pipeline;
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
@@ -90,6 +91,10 @@ public class BasebotDualTeleOp extends LinearOpMode {
         telemetry.update();
 
         limelight.pipelineSwitch(selectedPipeline.getValue());
+
+        Gamepad lastGamepad1 = new Gamepad();
+        Gamepad lastGamepad2 = new Gamepad();
+
         waitForStart();
 
         while (opModeIsActive()) {

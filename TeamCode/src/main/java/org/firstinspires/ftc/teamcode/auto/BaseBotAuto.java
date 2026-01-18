@@ -202,6 +202,7 @@ public class BaseBotAuto extends LinearOpMode {
             RobotState.setCurrentPose(robot.localizer.getPose());
             robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_2);
             stop();
+            RobotState.setCurrentPose(robot.localizer.getPose());
             return;
         }
 
