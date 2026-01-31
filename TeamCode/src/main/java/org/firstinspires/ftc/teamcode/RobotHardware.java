@@ -15,6 +15,7 @@ import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.configuration.typecontainers.MotorConfigurationType;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
@@ -65,23 +66,32 @@ public class RobotHardware extends MecanumDrive {
         index = hardwareMap.get(DcMotorEx.class, "index");
         intake = hardwareMap.get(DcMotorEx.class, "intake");
 
-        imu = hardwareMap.get(IMU.class, "imu");
 
-        frontLeft.setDirection(DcMotorSimple.Direction.REVERSE);
-        backLeft.setDirection(DcMotorSimple.Direction.REVERSE);
+        imu = hardwareMap.get(IMU.class, "imu");
 
         frontLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         frontRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         backRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
+        frontLeft.setDirection(DcMotorSimple.Direction.REVERSE);
+        backLeft.setDirection(DcMotorSimple.Direction.REVERSE);
+        backRight.setDirection(DcMotorSimple.Direction.FORWARD);
+        frontRight.setDirection(DcMotorSimple.Direction.FORWARD);
+//        frontLeft.setDirection(DcMotorSimple.Direction.FORWARD);
+//        backLeft.setDirection(DcMotorSimple.Direction.REVERSE);
+//        backRight.setDirection(DcMotorSimple.Direction.FORWARD);
+//        frontRight.setDirection(DcMotorSimple.Direction.REVERSE);
+
+//        lShooter.setDirection(DcMotorSimple.Direction.FORWARD);
+//        rShooter.setDirection(DcMotorSimple.Direction.REVERSE);
         lShooter.setDirection(DcMotorSimple.Direction.REVERSE);
         rShooter.setDirection(DcMotorSimple.Direction.FORWARD);
 
         lShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         rShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        lShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
-        rShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        lShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+        rShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
         imu.initialize(
                 new IMU.Parameters(
@@ -183,7 +193,7 @@ public class RobotHardware extends MecanumDrive {
 
             @Override
             public boolean run(@NotNull TelemetryPacket packet) {
-                setShooterVelocity(velocityTarget);
+                setShooterVelocity(velocity);
 
                 double vel = lShooter.getVelocity();
                 packet.put("vel", vel);
@@ -218,8 +228,8 @@ public class RobotHardware extends MecanumDrive {
                     return false;
                 }
 
-                double lVel = lShooter.getVelocity();
-                double rVel = rShooter.getVelocity();
+                double lVel = Math.abs(lShooter.getVelocity());
+                double rVel = Math.abs(rShooter.getVelocity());
 
                 if (timer.milliseconds() >= 7000) {
                     index.setPower(0);

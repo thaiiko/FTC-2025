@@ -188,10 +188,10 @@ public class BaseBotAuto extends LinearOpMode {
         // shoot and autoalign
         Actions.runBlocking(new SequentialAction(
                 new ParallelAction(
-                        robot.spinUpShooter(1100),
+//                        robot.spinUpShooter(1100),
                         robot.autoalign()
                 ),
-                robot.shootBall(3, 1100)
+                robot.shootBall(3, 800)
         ));
 //        robot.lShooter.setPower(0);
 //        robot.rShooter.setPower(0);

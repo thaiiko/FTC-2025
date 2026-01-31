@@ -303,12 +303,11 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             if (shooterOn) {
                 if (!xToggle) {
                     // Manual Power Mode
-                    robot.lShooter.setPower(shooterPower);
                     robot.rShooter.setPower(shooterPower);
+                    robot.lShooter.setPower(shooterPower);
                 } else {
                     // Auto Velocity Mode (Ballistic Solver)
                     robot.lShooter.setVelocity(motorVelocity);
-                    robot.rShooter.setVelocity(motorVelocity);
                 }
             } else {
                 // motors are off if can intake,
