@@ -172,52 +172,51 @@ public class BasebotTeleOp extends LinearOpMode {
                     turn // Rotational (heading)
             ));
             
-            /*
             // --- OLD DRIVE CONTROL LOGIC (Mecanum Math) ---
             
             // NOTE: rxModifier was previously declared as a local variable here (double rxModifier = 0.0) 
             // and is now declared above in the new drive control section.
 
             // Limelight Steering Assist Calculation (Using old 0.8 coefficient)
-            // if (bToggle) {
-            //     rxModifier = ((tx/27.25) * 0.8);
-            // } else {
-            //     rxModifier = 0.0;
-            // }
+             if (bToggle) {
+                 rxModifier = ((tx/27.25) * 0.8);
+             } else {
+                 rxModifier = 0.0;
+             }
 
             // Telemetry for Limelight Data
             // NOTE: Telemetry is now placed in the new active Drive Control section.
-            // if (!(tx == 0.0 && ty == 0.0 && ta == 0.0)) {
-            //     telemetry.addData("Target X (tx)", tx);
-            //     telemetry.addData("Target Y (ty)", ty);
-            //     telemetry.addData("Target Area (ta)", ta);
-            // }
+             if (!(tx == 0.0 && ty == 0.0 && ta == 0.0)) {
+                 telemetry.addData("Target X (tx)", tx);
+                 telemetry.addData("Target Y (ty)", ty);
+                 telemetry.addData("Target Area (ta)", ta);
+             }
 
             // Get stick inputs
-            // ly = -gamepad1.left_stick_y; // Variable removed
-            // lx = gamepad1.left_stick_x; // Variable removed
+             double ly = -gamepad1.left_stick_y; // Variable removed
+             double lx = gamepad1.left_stick_x; // Variable removed
 
             // Calculate rotation (rx), applying Limelight assist if toggled
-            // if (bToggle) {
-            //     rx = -gamepad1.right_stick_x * 0.85 + (rxModifier * 0.3);
-            // } else {
-            //     rx = -gamepad1.right_stick_x * 0.85;
-            // }
+            double rx;
+             if (bToggle) {
+                 rx = -gamepad1.right_stick_x * 0.85 + (rxModifier * 0.3);
+             } else {
+                 rx = -gamepad1.right_stick_x * 0.85;
+             }
 
             // Mecanum Drive Math
-            // double divisor = Math.max(Math.abs(ly) + Math.abs(lx) + Math.abs(rx), 1.0);
-            // double frontLeftPower = (ly + lx + rx) / divisor;
-            // double backLeftPower = (ly - lx + rx) / divisor;
-            // double frontRightPower = (ly - lx - rx) / divisor;
-            // double backRightPower = (ly + lx - rx) / divisor;
+             double divisor = Math.max(Math.abs(ly) + Math.abs(lx) + Math.abs(rx), 1.0);
+             double frontLeftPower = (ly + lx + rx) / divisor;
+             double backLeftPower = (ly - lx + rx) / divisor;
+             double frontRightPower = (ly - lx - rx) / divisor;
+             double backRightPower = (ly + lx - rx) / divisor;
 
             // Apply power with slowdown
-            // final double SLOWDOWN_FACTOR = 0.85;
-            // robot.frontLeft.setPower(frontLeftPower * SLOWDOWN_FACTOR);
-            // robot.frontRight.setPower(frontRightPower * SLOWDOWN_FACTOR);
-            // robot.backLeft.setPower(backLeftPower * SLOWDOWN_FACTOR);
-            // robot.backRight.setPower(backRightPower * SLOWDOWN_FACTOR);
-            */
+             final double SLOWDOWN_FACTOR = 0.85;
+             robot.frontLeft.setPower(frontLeftPower * SLOWDOWN_FACTOR);
+             robot.frontRight.setPower(frontRightPower * SLOWDOWN_FACTOR);
+             robot.backLeft.setPower(backLeftPower * SLOWDOWN_FACTOR);
+             robot.backRight.setPower(backRightPower * SLOWDOWN_FACTOR);
 
             robot.updatePoseEstimate();
             telemetry.addData("Distance Sensor", robot.distance1.getState());

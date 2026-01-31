@@ -9,7 +9,9 @@ import com.qualcomm.hardware.limelightvision.Limelight3A;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Gamepad;
+import com.qualcomm.robotcore.hardware.OpticalDistanceSensor;
 
+import org.firstinspires.ftc.robotcore.external.JavaUtil;
 import org.firstinspires.ftc.teamcode.Pipeline;
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
 import org.firstinspires.ftc.teamcode.RobotHardware;
@@ -23,12 +25,12 @@ import java.util.Objects;
 public class BasebotUnifiedTeleOp extends LinearOpMode {
     // --- Constants for Ballistic Solver ---
     private static final double TARGET_FEET = 3.875; // Target height above launcher in feet
-    private static final double LAUNCH_ANGLE_DEG = 48.0;
+    private static final double LAUNCH_ANGLE_DEG = 44.0;
     private static final double LAUNCH_ANGLE_RAD = Math.toRadians(LAUNCH_ANGLE_DEG);
     private static final double GRAVITY_FT_S2 = 32.2; // Gravity in ft/s^2
     private static final double SHOOTER_WHEEL_DIAMETER_FT = 0.315; // Diameter of shooter wheel in feet
     private static final double RPM_EMPIRICAL_FACTOR = 1.2;
-    private static final double RPM_MAGIC_CONSTANT = 120.0;
+    private static final double RPM_MAGIC_CONSTANT = 60.0;
 
     // --- State Variables ---
     private double targetDistance; // Calculated distance to target in feet
@@ -103,7 +105,7 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
 
         while (opModeInInit()) {
             // Controller mode selection
-            if (gamepad1.options) {
+            if (gamepad1.start) {
                 debugMode = !debugMode;
                 telemetry.addData("Debug Mode", debugMode ? "Enabled" : "Disabled");
                 telemetry.update();
@@ -162,14 +164,25 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             double rawVelocity = robot.lShooter.getVelocity();
             double currentRpm = rawVelocity / TICKS_PER_REV * 60;
             telemetry.addData("Target RPM (Display)", targetRPM);
+            telemetry.addData("Light Detected", ((OpticalDistanceSensor) robot.color1).getLightDetected());
+
+//            double r = robot.color1.getNormalizedColors().red;
+//            double g = robot.color1.getNormalizedColors().green;
+//            double b = robot.color1.getNormalizedColors().blue;
+            telemetry.addData("hue", JavaUtil.colorToHue(robot.color1.getNormalizedColors().toColor()));
+            telemetry.addData("saturation", JavaUtil.colorToSaturation(robot.color1.getNormalizedColors().toColor()));
+            telemetry.addData("value", JavaUtil.colorToValue(robot.color1.getNormalizedColors().toColor()));
 
             // Ballistic solver: calculates required velocity (v) in ft/s
             Pose2d blueTower = new Pose2d(-60, -57, 0); // Tower position in inches (assumed)
 
-            double distanceToTowerInches = Math.sqrt(
-                Math.pow(robot.localizer.getPose().position.x - blueTower.position.x, 2) +
-                Math.pow(robot.localizer.getPose().position.y - blueTower.position.y, 2)
-            );
+            double limelightMountAngleDeg = 10;
+            double limelightInFromGround = 13.0;
+            double goalHeightInches = 29.5;
+            double angleToGoalDegrees = limelightMountAngleDeg + ty;
+            double angleToGoalRadians = Math.toRadians(angleToGoalDegrees);
+            double distanceToTowerInches = (goalHeightInches - limelightInFromGround) / Math.tan(angleToGoalRadians);
+
             // Convert calculated distance from inches (RoadRunner default) to feet
             targetDistance = distanceToTowerInches / 12.0; 
 
@@ -217,7 +230,7 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             double rxModifier = 0.0;
             if (bToggle) {
                 // Add assist to rotation
-                rxModifier = -((tx / 27.25) * 0.6);
+                rxModifier = -((tx / 27.25) * 0.4);
                 turn += rxModifier;
             }
 

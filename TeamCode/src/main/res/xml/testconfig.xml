@@ -8,6 +8,7 @@
             <goBILDA5201SeriesMotor name="intake" port="3" />
             <DigitalDevice name="distance1" port="0" />
             <goBILDAPrism name="prism" port="0" bus="0" />
+            <RevColorSensorV3 name="color1" port="0" bus="3" />
         </LynxModule>
         <LynxModule name="Control Hub" port="173">
             <goBILDA5201SeriesMotor name="backLeft" port="0" />

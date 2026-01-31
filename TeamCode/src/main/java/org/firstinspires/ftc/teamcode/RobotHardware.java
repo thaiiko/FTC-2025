@@ -7,13 +7,16 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.hardware.rev.RevColorSensorV3;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
+import com.qualcomm.robotcore.hardware.ColorSensor;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.NormalizedColorSensor;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
@@ -37,6 +40,13 @@ public class RobotHardware extends MecanumDrive {
     public Limelight3A limelight;
     public Servo light1;
     public DigitalChannel distance1;
+
+    public RevColorSensorV3 color1;
+    public NormalizedColorSensor color2;
+    public NormalizedColorSensor color3;
+    public NormalizedColorSensor color4;
+
+
 //    public DistanceSensor distanceSensor;
 //    public getPose() {
 //        return super();
@@ -47,6 +57,12 @@ public class RobotHardware extends MecanumDrive {
 //    }
     public RobotHardware(HardwareMap hardwareMap, Pose2d pose) {
         super(hardwareMap, pose);
+
+        color1 = hardwareMap.get(RevColorSensorV3.class, "color1");
+//        color1.setGain(50);
+//        color2 = hardwareMap.get(NormalizedColorSensor.class, "color2");
+//        color3 = hardwareMap.get(NormalizedColorSensor.class, "color3");
+//        color4 = hardwareMap.get(NormalizedColorSensor.class, "color4");
 
         distance1 = hardwareMap.get(DigitalChannel.class, "distance1");
         distance1.setMode(DigitalChannel.Mode.INPUT);
@@ -69,6 +85,7 @@ public class RobotHardware extends MecanumDrive {
 
         frontLeft.setDirection(DcMotorSimple.Direction.REVERSE);
         backLeft.setDirection(DcMotorSimple.Direction.REVERSE);
+//        backRight.setDirection(DcMotorSimple.Direction.REVERSE);
 
         frontLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         frontRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
