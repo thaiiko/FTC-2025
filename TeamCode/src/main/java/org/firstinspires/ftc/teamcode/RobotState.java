@@ -3,6 +3,21 @@ package org.firstinspires.ftc.teamcode;
 import com.acmerobotics.roadrunner.Pose2d;
 
 public class RobotState {
+    static Artifact[] artifacts = new Artifact[3];
+    static int currentArtifactIndex;
+    public static Artifact[] getArtifacts() {
+        return artifacts;
+    }
+    public static int getArtifactIndex() {
+        return currentArtifactIndex;
+    }
+    public static Artifact[] setArtifacts(int index, Artifact artifact) {
+        artifacts[index] = artifact;
+        return artifacts;
+    }
+    public static void setArtifactIndex(int index) {
+        currentArtifactIndex = Math.max(Math.min(index, 2), 0);
+    }
     static int ballsIn = 3;
     static Pose2d currentPose = new Pose2d(0, 0, 180);
 

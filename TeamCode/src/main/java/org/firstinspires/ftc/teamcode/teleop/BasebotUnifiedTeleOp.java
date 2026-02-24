@@ -12,8 +12,12 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 
 import org.firstinspires.ftc.teamcode.Pipeline;
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
+import org.firstinspires.ftc.teamcode.Prism.Speedometer;
 import org.firstinspires.ftc.teamcode.RobotHardware;
 import org.firstinspires.ftc.teamcode.RobotState;
+import org.firstinspires.ftc.teamcode.Artifact;
+
+import org.firstinspires.ftc.robotcore.external.JavaUtil;
 
 import java.util.List;
 import java.util.Objects;
@@ -21,6 +25,17 @@ import java.util.Objects;
 
 @TeleOp(name = "BaseBot Unified Teleop")
 public class BasebotUnifiedTeleOp extends LinearOpMode {
+    // --- Intake/Shoot Tracking Constants ---
+    private static final double GREEN_HUE_MIN = 48;
+    private static final double GREEN_HUE_MAX = 165;
+    private static final double PURPLE_HUE_MIN = 211;
+    private static final double PURPLE_HUE_MAX = 338;
+    private static final double LIGHT_PURPLE = 0.7;
+    private static final double LIGHT_GREEN = 0.5;
+
+    // --- Intake/Shoot Tracking State ---
+    private boolean lastBallSeenIntake = false;  // For intake tracking (color sensor debounce)
+    private boolean lastBallSeenShoot = false;   // For shoot tracking (distance sensor debounce)
     // --- Constants for Ballistic Solver ---
     private static final double TARGET_FEET = 3.875; // Target height above launcher in feet
     private static final double LAUNCH_ANGLE_DEG = 48.0;
@@ -45,6 +60,7 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
     boolean isDualMode = false;
     boolean humanPlayer = false;
     boolean debugMode = false;
+    private double oldRPM;
 
 
     /**
@@ -64,6 +80,7 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
     public void runOpMode() {
         // --- Initialization and Toggles ---
         double shooterPower = 0.6;
+        double shooterRPM = 800;
 
         boolean previousDpadUp = false;
         boolean previousDpadDown = false;
@@ -87,6 +104,7 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
 
         robot = new RobotHardware(hardwareMap, RobotState.getCurrentPose());
         limelight = robot.limelight;
+        Speedometer speedometer = new Speedometer(robot);
 
         robot.prism.setStripLength(29);
 
@@ -154,22 +172,29 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
         telemetry.addData("Status", "Initialized");
         telemetry.update();
 
+        double oldRuntime = getRuntime();
+
         limelight.pipelineSwitch(selectedPipeline.getValue());
         waitForStart();
 
-        while (opModeIsActive()) {
+        while (!isStopRequested()) {
             // --- Shooter Telemetry and Motor Velocity Calculations ---
             double rawVelocity = robot.lShooter.getVelocity();
-            double currentRpm = rawVelocity / TICKS_PER_REV * 60;
-            telemetry.addData("Target RPM (Display)", targetRPM);
+//            double currentRpm = rawVelocity / TICKS_PER_REV * 60;
+//            telemetry.addData("Target RPM (Display)", targetRPM);
+            telemetry.addData("Velocity", rawVelocity);
 
             // Ballistic solver: calculates required velocity (v) in ft/s
             Pose2d blueTower = new Pose2d(-60, -57, 0); // Tower position in inches (assumed)
 
-            double distanceToTowerInches = Math.sqrt(
-                Math.pow(robot.localizer.getPose().position.x - blueTower.position.x, 2) +
-                Math.pow(robot.localizer.getPose().position.y - blueTower.position.y, 2)
-            );
+            double limelightMountAngleDeg = 10;
+            double limelightInFromGround = 13.0;
+            double goalHeightInches = 29.5;
+            double angleToGoalDegrees = limelightMountAngleDeg + ty;
+            double angleToGoalRadians = Math.toRadians(angleToGoalDegrees);
+            double distanceToTowerInches = (goalHeightInches - limelightInFromGround) / Math.tan(angleToGoalRadians);
+            speedometer.speedAnim(-gamepad1.left_stick_y);
+
             // Convert calculated distance from inches (RoadRunner default) to feet
             targetDistance = distanceToTowerInches / 12.0; 
 
@@ -192,10 +217,9 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             double motorRpm = (RPM_MAGIC_CONSTANT * velocity) / (Math.PI * SHOOTER_WHEEL_DIAMETER_FT) * RPM_EMPIRICAL_FACTOR;
             double motorVelocity = motorRpm * TICKS_PER_REV / 60;
 
-            telemetry.addData("Current RPM", currentRpm);
             addDebugTelemetry("Required Launch Velocity (ft/s)", velocity);
             addDebugTelemetry("Target Distance (feet)", targetDistance);
-            telemetry.addData("Required Motor Velocity (ticks/s)", motorVelocity);
+            addDebugTelemetry("Required Motor Velocity (ticks/s)", motorVelocity);
             telemetry.addData("Launch Angle", "deg=" + LAUNCH_ANGLE_DEG);
 
             // --- Limelight Data Fetch ---
@@ -231,8 +255,8 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             // Apply powers with cubic scaling for translation (x/y)
             robot.setDrivePowers(new PoseVelocity2d(
                     new Vector2d(
-                            -1.33 * Math.pow(gamepad1.left_stick_y, 3), // Axial (y)
-                            -1.33 * Math.pow(gamepad1.left_stick_x, 3)  // Lateral (x)
+                            -1.33 * (0.7 * Math.pow(gamepad1.left_stick_y, 3)), // Axial (y)
+                            -1.33 * (0.7 *Math.pow(gamepad1.left_stick_x, 3))// Lateral (x)
                     ),
                     turn // Rotational (heading)
             ));
@@ -244,7 +268,7 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             // --- Consolidated Intake and Index Control (using getMechanismGamepad()) ---
             double indexPower = 0.0;
             double intakePower = 0.0;
-            final double RT_THRESHOLD = 0.1;
+            final double RT_THRESHOLD = 0.2;
 
             Gamepad mechGP = getMechanismGamepad();
 
@@ -264,23 +288,36 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
                 indexPower = 0.0;
             } else if (mechGP.y) {
                 // Gamepad Y: Index Reverse (to clear jams - momentary press)
-                indexPower = humanPlayer ? 1.0 : 0.5;
+                indexPower = humanPlayer ? -1.0 : -0.5;
                 intakePower = 0.0;
             }
 
             robot.index.setPower(indexPower);
             robot.intake.setPower(intakePower);
 
+            // --- Track Ball Intake and Shooting ---
+            // Track intake when intake is running (positive power)
+            if (intakePower > 0) {
+                trackIntake();
+            } else {
+                lastBallSeenIntake = false; // Reset debounce when not intaking
+            }
+            // Track shooting when shooter is on
+            trackShoot(shooterOn);
+
             // --- Shooter Power Adjustments (mechanism gamepad DPAD) ---
             if (mechGP.dpad_up && !previousDpadUp) {
                 shooterPower = Math.min(1.0, shooterPower + 0.01);
+                shooterRPM += 50;
             }
 
             if (mechGP.dpad_down && !previousDpadDown) {
                 shooterPower = Math.max(0.0, shooterPower - 0.01);
+                shooterRPM -= 50;
             }
 
             telemetry.addData("Manual Shooter Power", shooterPower);
+            telemetry.addData("Manual Shooter RPM", shooterRPM);
 
             // Shooter On/Off Toggles
             if (mechGP.right_bumper) {
@@ -303,12 +340,17 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             if (shooterOn) {
                 if (!xToggle) {
                     // Manual Power Mode
-                    robot.lShooter.setPower(shooterPower);
-                    robot.rShooter.setPower(shooterPower);
+                    if ((getRuntime() > oldRuntime + 1000) || oldRPM != shooterRPM) {
+                        robot.rShooter.setVelocity(shooterRPM);
+                        robot.lShooter.setVelocity(shooterRPM);
+                        oldRuntime = getRuntime();
+                        oldRPM = shooterRPM;
+                    }
                 } else {
                     // Auto Velocity Mode (Ballistic Solver)
-                    robot.lShooter.setVelocity(motorVelocity);
-                    robot.rShooter.setVelocity(motorVelocity);
+//                    robot.lShooter.setVelocity(motorVelocity);
+                    robot.rShooter.setPower(shooterPower);
+                    robot.lShooter.setPower(shooterPower);
                 }
             } else {
                 // motors are off if can intake,
@@ -329,6 +371,7 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             telemetry.addData("Shooter Speed (Limelight)", getMotorSpeed(ta));
             telemetry.update();
         }
+        robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_0);
     }
     
     // --- Helper Methods ---
@@ -370,5 +413,174 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
     // Kept the original helper, but it seems unused/deprecated by the main solver logic.
     public double getDistanceFromTag(double targetArea) {
         return targetArea * 66; 
+    }
+
+    // --- Intake and Shoot Tracking Methods ---
+
+    /**
+     * Tracks balls being intaken using color sensors.
+     * Detects GREEN or PURPLE artifacts and adds them to the RobotState array.
+     * Handles overflow gracefully by not crashing if "too many" balls are detected.
+     * Call this every loop iteration when intake is running.
+     */
+    private void trackIntake() {
+        double hue1 = JavaUtil.colorToHue(robot.color1.getNormalizedColors().toColor());
+        double hue2 = JavaUtil.colorToHue(robot.color2.getNormalizedColors().toColor());
+
+        Artifact detectedArtifact = detectArtifact(hue1, hue2);
+        boolean ballCurrentlySeen = (detectedArtifact != null);
+
+        // Edge detection: only count when we first see a ball (rising edge)
+        if (ballCurrentlySeen && !lastBallSeenIntake) {
+            int currentIndex = RobotState.getArtifactIndex();
+
+            // Only add if we have room (index < 3), handles overflow gracefully
+            if (currentIndex < 3) {
+                RobotState.setArtifacts(currentIndex, detectedArtifact);
+                updateIndicatorLight(currentIndex, detectedArtifact);
+                RobotState.setArtifactIndex(currentIndex + 1);
+                RobotState.setBallsIn(RobotState.getBallsIn() + 1);
+
+                addDebugTelemetry("Intake Detected", detectedArtifact.name() + " at index " + currentIndex);
+            } else {
+                // Overflow: still detected a ball but array is full
+                addDebugTelemetry("Intake Overflow", "Ball detected but storage full!");
+            }
+        }
+
+        lastBallSeenIntake = ballCurrentlySeen;
+    }
+
+    /**
+     * Tracks balls being shot out by monitoring the distance sensor.
+     * When a ball breaks the sensor beam while shooter is on, it removes the first artifact.
+     * Call this every loop iteration when shooter is running.
+     *
+     * @param shooterOn Whether the shooter motors are currently running.
+     */
+    private void trackShoot(boolean shooterOn) {
+        if (!shooterOn) {
+            // Reset state when shooter is off to avoid false triggers
+            lastBallSeenShoot = false;
+            return;
+        }
+
+        // distance1.getState() returns true when beam is broken (ball detected)
+        boolean ballCurrentlySeen = robot.distance1.getState();
+
+        // Falling edge detection: ball was seen, now it's not = ball has passed through
+        if (!ballCurrentlySeen && lastBallSeenShoot) {
+            int ballsIn = RobotState.getBallsIn();
+
+            if (ballsIn > 0) {
+                // Shift all artifacts down (remove first one, FIFO style)
+                shiftArtifactsDown();
+                RobotState.setBallsIn(ballsIn - 1);
+
+                // Update the artifact index
+                int newIndex = Math.max(0, RobotState.getArtifactIndex() - 1);
+                RobotState.setArtifactIndex(newIndex);
+
+                addDebugTelemetry("Shot Detected", "Balls remaining: " + (ballsIn - 1));
+
+                // Update indicator lights
+                updateAllIndicatorLights();
+            }
+        }
+
+        lastBallSeenShoot = ballCurrentlySeen;
+    }
+
+    /**
+     * Shifts all artifacts down by one position (removes the first/oldest artifact).
+     * This implements FIFO behavior for the ball magazine.
+     */
+    private void shiftArtifactsDown() {
+        Artifact[] artifacts = RobotState.getArtifacts();
+
+        // Shift elements: index 1 -> 0, index 2 -> 1
+        for (int i = 0; i < artifacts.length - 1; i++) {
+            RobotState.setArtifacts(i, artifacts[i + 1]);
+        }
+        // Clear the last slot
+        RobotState.setArtifacts(artifacts.length - 1, null);
+    }
+
+    /**
+     * Updates all indicator lights based on current artifact state.
+     */
+    private void updateAllIndicatorLights() {
+        Artifact[] artifacts = RobotState.getArtifacts();
+
+        for (int i = 0; i < 3; i++) {
+            if (artifacts[i] != null) {
+                updateIndicatorLight(i, artifacts[i]);
+            } else {
+                // Turn off light for empty slot
+                clearIndicatorLight(i);
+            }
+        }
+    }
+
+    /**
+     * Detects artifact type based on hue values from color sensors.
+     * @param hue1 Hue from first color sensor
+     * @param hue2 Hue from second color sensor
+     * @return The detected Artifact type, or null if no valid artifact detected
+     */
+    private Artifact detectArtifact(double hue1, double hue2) {
+        if (isInRange(hue1, GREEN_HUE_MIN, GREEN_HUE_MAX) ||
+            isInRange(hue2, GREEN_HUE_MIN, GREEN_HUE_MAX)) {
+            return Artifact.GREEN;
+        } else if (isInRange(hue1, PURPLE_HUE_MIN, PURPLE_HUE_MAX) ||
+                   isInRange(hue2, PURPLE_HUE_MIN, PURPLE_HUE_MAX)) {
+            return Artifact.PURPLE;
+        }
+        return null;
+    }
+
+    /**
+     * Checks if a value is within the specified range (exclusive).
+     */
+    private boolean isInRange(double value, double min, double max) {
+        return value > min && value < max;
+    }
+
+    /**
+     * Updates the indicator light for a given slot based on artifact type.
+     * @param slot The artifact slot index (0-2)
+     * @param artifact The artifact type
+     */
+    private void updateIndicatorLight(int slot, Artifact artifact) {
+        double position = (artifact == Artifact.PURPLE) ? LIGHT_PURPLE : LIGHT_GREEN;
+        switch (slot) {
+            case 0:
+                robot.light2.setPosition(position);
+                break;
+            case 1:
+                robot.light3.setPosition(position);
+                break;
+            case 2:
+                robot.light4.setPosition(position);
+                break;
+        }
+    }
+
+    /**
+     * Clears (turns off) the indicator light for a given slot.
+     * @param slot The artifact slot index (0-2)
+     */
+    private void clearIndicatorLight(int slot) {
+        switch (slot) {
+            case 0:
+                robot.light2.setPosition(0);
+                break;
+            case 1:
+                robot.light3.setPosition(0);
+                break;
+            case 2:
+                robot.light4.setPosition(0);
+                break;
+        }
     }
 }
