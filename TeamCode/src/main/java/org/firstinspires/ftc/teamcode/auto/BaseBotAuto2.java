@@ -15,25 +15,22 @@ import com.skeletonarmy.marrow.TimerEx;
 import org.firstinspires.ftc.teamcode.Alliance;
 import org.firstinspires.ftc.teamcode.Pipeline;
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
+import org.firstinspires.ftc.teamcode.RaceParallelAction;
 import org.firstinspires.ftc.teamcode.RobotHardware;
 import org.firstinspires.ftc.teamcode.RobotState;
 
 import java.util.concurrent.TimeUnit;
 
-@Autonomous(name = "Basebot Auto V2")
-public class BaseBotAutoV2 extends LinearOpMode {
+@Autonomous(name = "Basebot Auto v2")
+public class BaseBotAuto2 extends LinearOpMode {
     RobotHardware robot = null;
-    int cycles = 4;
-    boolean close = false;
-    Alliance alliance = Alliance.BLUE;
+    double cycles = 4;
+    boolean close;
+    boolean pattern;
+    Alliance alliance;
 //    private final Prompter prompter = new Prompter(this);
     public double sideMultiplier;
-
-    enum Selection {
-        ALLIANCE,
-        CLOSE_SHOT,
-        CYCLES
-    }
+    final double MOTOR_VELOCITY = 1145;
 
     double facingGate;
     Pose2d farShot;
@@ -47,101 +44,117 @@ public class BaseBotAutoV2 extends LinearOpMode {
     @Override
     public void runOpMode() {
         TimerEx timer = new TimerEx(30, TimeUnit.SECONDS);
-        robot = new RobotHardware(hardwareMap, new Pose2d(64.75, -7.125, Math.toRadians(180)));
 
-        robot.limelight.pipelineSwitch(1);
         boolean lastDpadDown = false;
         boolean lastDpadUp = false;
-        boolean lastDpadLeft = false;
-        boolean lastDpadRight = false;
 
-        Selection currentSelection = Selection.ALLIANCE;
-
+        boolean closeChosen = false;
         while (opModeInInit()) {
-            telemetry.addLine("--- Autonomous Configuration ---");
+            if (alliance == null) {
+                telemetry.addLine("Selected Side: Press X for Blue, B for Red");
+            } else {
+                telemetry.addData("Selected Side", alliance);
+            }
+            if (!closeChosen) {
+                telemetry.addLine("Close Shot: Press A for true, Y for false");
+            } else {
+                telemetry.addData("Close Shot", close);
+            }
 
-            // Alliance Selection
-            String allianceBracket = (currentSelection == Selection.ALLIANCE) ? "> " : "  ";
-            telemetry.addLine(allianceBracket + "Alliance: < " + (alliance == Alliance.BLUE ? "BLUE" : "RED") + " >");
-
-            // Close Shot Selection
-            String closeBracket = (currentSelection == Selection.CLOSE_SHOT) ? "> " : "  ";
-            telemetry.addLine(closeBracket + "Close Shot: < " + (close ? "TRUE" : "FALSE") + " >");
-
-            // Cycles Selection
-            String cyclesBracket = (currentSelection == Selection.CYCLES) ? "> " : "  ";
-            telemetry.addLine(cyclesBracket + "Cycles: < " + cycles + " >");
-
+            telemetry.addData("Cycles", cycles);
+            telemetry.addData("pattern first", pattern);
             telemetry.update();
 
-            // Navigation
+            if (gamepad1.x) {
+                alliance = Alliance.BLUE;
+            }
+
+            if (gamepad1.b) {
+                alliance = Alliance.RED;
+            }
+            if (gamepad1.dpad_right) {
+                pattern = true;
+            }
+            if (gamepad1.dpad_left) {
+                pattern = false;
+            }
+
+            if (gamepad1.a) {
+                close = true;
+                closeChosen = true;
+            }
+
+            if (gamepad1.y) {
+                close = false;
+                closeChosen = true;
+            }
+
             if (gamepad1.dpad_down && !lastDpadDown) {
-                int nextOrdinal = (currentSelection.ordinal() + 1) % Selection.values().length;
-                currentSelection = Selection.values()[nextOrdinal];
+                cycles = Math.max(cycles - 1, 0);
             }
 
             if (gamepad1.dpad_up && !lastDpadUp) {
-                int prevOrdinal = (currentSelection.ordinal() - 1 + Selection.values().length) % Selection.values().length;
-                currentSelection = Selection.values()[prevOrdinal];
-            }
-
-            // Selection adjustment
-            if ((gamepad1.dpad_left && !lastDpadLeft) || (gamepad1.dpad_right && !lastDpadRight)) {
-                switch (currentSelection) {
-                    case ALLIANCE:
-                        alliance = (alliance == Alliance.BLUE) ? Alliance.RED : Alliance.BLUE;
-                        break;
-                    case CLOSE_SHOT:
-                        close = !close;
-                        break;
-                    case CYCLES:
-                        if (gamepad1.dpad_left && !lastDpadLeft) {
-                            cycles = Math.max(cycles - 1, 0);
-                        } else if (gamepad1.dpad_right && !lastDpadRight) {
-                            cycles = Math.min(cycles + 1, 4);
-                        }
-                        break;
-                }
+                cycles = Math.min(cycles + 1, 4);
             }
 
             lastDpadDown = gamepad1.dpad_down;
             lastDpadUp = gamepad1.dpad_up;
-            lastDpadLeft = gamepad1.dpad_left;
-            lastDpadRight = gamepad1.dpad_right;
+        }
+
+
+        if (alliance.equals(Alliance.BLUE)) {
+            farStart = new Pose2d(new Vector2d(64.75, -7.125), Math.toRadians(180));
+        } else {
+            farStart = new Pose2d(new Vector2d(64.75, 9), Math.toRadians(180));
+        }
+        Pose2d start = close ? closeStart : farStart;
+
+        robot = new RobotHardware(hardwareMap, start);
+
+        robot.limelight.pipelineSwitch(0);
+        LLResult result = robot.limelight.getLatestResult();
+        sleep(10);
+        int fiducialId = 0;
+        if (result != null && result.getFiducialResults() != null
+                && !result.getFiducialResults().isEmpty()) {
+            fiducialId = result.getFiducialResults().get(0).getFiducialId();
         }
 
         if (alliance.equals(Alliance.BLUE)) {
             robot.limelight.pipelineSwitch(Pipeline.BLUE_PIPELINE.getValue());
+            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_1);
+            facingGate = 270;
         } else {
             robot.limelight.pipelineSwitch(Pipeline.RED_PIPELINE.getValue());
-        }
-
-        if (alliance.equals(Alliance.BLUE)) {
-            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_1);
-        } else {
             robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_0);
-        }
-
-
-        sideMultiplier = alliance.getValue();
-
-        if (sideMultiplier == -1) {
-            facingGate = 270;
-        } else if (sideMultiplier == 1) {
             facingGate = 90;
         }
 
-        PPG = new Pose2d(new Vector2d(37, 29 * sideMultiplier), Math.toRadians(facingGate));
-        PGP = new Pose2d(new Vector2d(12, 29 * sideMultiplier), Math.toRadians(facingGate));
-        GPP = new Pose2d(new Vector2d(-10.5, 29 * sideMultiplier), Math.toRadians(facingGate));
-        if (alliance.equals(Alliance.BLUE)) {
-            farShot = new Pose2d(new Vector2d(60, 8 * sideMultiplier), Math.toRadians(200));
-        } else {
-            farShot = new Pose2d(new Vector2d(60, 2), Math.toRadians(155));
-        }
+        sideMultiplier = alliance.getValue();
+
+        PPG = new Pose2d(new Vector2d(33, 25 * sideMultiplier), Math.toRadians(facingGate));
+        PGP = new Pose2d(new Vector2d(12, 25 * sideMultiplier), Math.toRadians(facingGate));
+        GPP = new Pose2d(new Vector2d(-10.5, 25 * sideMultiplier), Math.toRadians(facingGate));
+        farShot = new Pose2d(new Vector2d(60, 8 * sideMultiplier), Math.toRadians(alliance.equals(Alliance.BLUE) ? 200: 155));
         closeShot = new Pose2d(new Vector2d(-10, 10 * sideMultiplier), Math.toRadians(225));
         farStart = new Pose2d(new Vector2d(64.75, 7.125 * sideMultiplier), Math.toRadians(180));
-        closeStart = new Pose2d(new Vector2d(-50, 50 * sideMultiplier), Math.toRadians(135));
+        closeStart = new Pose2d(new Vector2d(-58, 50 * sideMultiplier), Math.toRadians(45));
+        Pose2d lastIntake;
+
+        switch (fiducialId) {
+            case 21:
+                lastIntake = GPP;
+                break;
+            case 22:
+                lastIntake = PGP;
+                break;
+            case 23:
+                lastIntake = PPG;
+                break;
+            default:
+                lastIntake = close ? GPP : PPG;
+                break;
+        }
 
         Pose2d targetShot = close ? closeShot : farShot;
 
@@ -153,23 +166,19 @@ public class BaseBotAutoV2 extends LinearOpMode {
         // If zero cycles is selected, we get off the line
         if (cycles == 0) {
             Actions.runBlocking(
-                    robot.actionBuilder(close ? closeStart : farStart)
-                            .strafeToSplineHeading(new Vector2d(42, 7.125 * sideMultiplier), Math.toRadians(180))
+                    robot.actionBuilder(start)
+                            .strafeToSplineHeading(close ? new Vector2d(-50, 20 * sideMultiplier) : new Vector2d(42, 7.125 * sideMultiplier), facingGate)
                             .build()
             );
             RobotState.setCurrentPose(robot.localizer.getPose());
-            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_2);
+            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_7);
             stop();
             return;
         }
 
-        // pre speed up the shooter
-        robot.lShooter.setVelocity(1100);
-        robot.rShooter.setVelocity(1100);
-
         // choose which start to use based on the config segment
         Actions.runBlocking(
-                robot.actionBuilder(close ? closeStart : farStart)
+                robot.actionBuilder(start)
                         .strafeToSplineHeading(targetShot.position, targetShot.heading)
                         .build()
         );
@@ -178,82 +187,78 @@ public class BaseBotAutoV2 extends LinearOpMode {
 
         // shoot and autoalign
         Actions.runBlocking(new SequentialAction(
-                new ParallelAction(
-//                        robot.spinUpShooter(1100),
+                new RaceParallelAction(
+                        robot.spinUpShooter(MOTOR_VELOCITY),
                         robot.autoalign()
                 ),
-                robot.shootBall(3, 800)
+                robot.shootBall(3, MOTOR_VELOCITY)
         ));
-//        robot.lShooter.setPower(0);
-//        robot.rShooter.setPower(0);
         telemetry.addData("Balls", RobotState.getBallsIn());
         telemetry.update();
 
         if (cycles == 1) {
             RobotState.setCurrentPose(robot.localizer.getPose());
             robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_2);
-            stop();
             RobotState.setCurrentPose(robot.localizer.getPose());
+            stop();
             return;
         }
 
-        // go to PPG (Intake segment 1)
         Actions.runBlocking(
                 robot.actionBuilder(robot.localizer.getPose())
                         .strafeToSplineHeading(
-                                PPG.position,
-                                PPG.heading
-//                                new TranslationalVelConstraint(20.0),
-//                                new ProfileAccelConstraint(-15.0, 50.0)
+                            PPG.position,
+                            PPG.heading
                         )
                         .build()
         );
         RobotState.setCurrentPose(robot.localizer.getPose());
 
 
-        // Intake until we take in the amount of balls we need (Intake segment 2)
         Actions.runBlocking(
-                new SequentialAction(
-                        robot.startIntake(),
-                        robot.actionBuilder(robot.localizer.getPose())
-                                .strafeToSplineHeading(
-                                        new Vector2d(PPG.position.x, (sideMultiplier * RobotState.getY(/* RobotState.getBallsIn() */ 0))),
-                                        Math.toRadians(facingGate),
-                                        new TranslationalVelConstraint(32.0),
-                                        new ProfileAccelConstraint(-15.0, 50.0)
-                                )
-                                .build()
-
-                )
-        );
-        RobotState.setCurrentPose(robot.localizer.getPose());
-
-        // run back to the back shooting area.
-        Actions.runBlocking(
+            new SequentialAction(
                 robot.actionBuilder(robot.localizer.getPose())
-                        .strafeToSplineHeading(targetShot.position, targetShot.heading)
-                        .build()
+                    .strafeToSplineHeading(
+                            PPG.position,
+                            PPG.heading
+                    ).build(),
+                robot.startIntake(),
+                new RaceParallelAction(
+                    robot.actionBuilder(robot.localizer.getPose())
+                        .strafeToSplineHeading(
+                                new Vector2d(PPG.position.x, (sideMultiplier * RobotState.getY(RobotState.getBallsIn()))),
+                                Math.toRadians(facingGate),
+                                new TranslationalVelConstraint(32.0),
+                                new ProfileAccelConstraint(-15.0, 50.0)
+                        )
+                    .build(),
+                    robot.intakeTracker.trackIntakeAction()
+                ),
+                robot.stopIntake(),
+                robot.actionBuilder(robot.localizer.getPose())
+                    .strafeToSplineHeading(targetShot.position, targetShot.heading)
+                    .build()
+            )
         );
-
-        // shoot #2
         Actions.runBlocking(
                 new SequentialAction(
-                        new ParallelAction(
-                            robot.spinUpShooter(1100),
-                            robot.autoalign()
+                        new RaceParallelAction(
+                                robot.spinUpShooter(MOTOR_VELOCITY),
+                                robot.autoalign()
                         ),
-                        robot.shootBall(3, 1100)
+                        robot.shootBall(3, MOTOR_VELOCITY)
                 )
         );
         RobotState.setCurrentPose(robot.localizer.getPose());
+
 
         telemetry.addData("Balls", RobotState.getBallsIn());
         telemetry.update();
 
         if (cycles == 2) {
-            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_2);
-            stop();
+            robot.prism.loadAnimationsFromArtboard(GoBildaPrismDriver.Artboard.ARTBOARD_7);
             RobotState.setCurrentPose(robot.localizer.getPose());
+            stop();
             return;
         }
 
@@ -262,9 +267,9 @@ public class BaseBotAutoV2 extends LinearOpMode {
                 robot.actionBuilder(robot.localizer.getPose())
                         .strafeToLinearHeading(
                                 PGP.position,
-                                PGP.heading,
-                                new TranslationalVelConstraint(15.0),
-                                new ProfileAccelConstraint(-15.0, 40.0)
+                                PGP.heading
+//                                new TranslationalVelConstraint(15.0),
+//                                new ProfileAccelConstraint(-15.0, 40.0)
                         )
                         .build()
         );
@@ -274,14 +279,18 @@ public class BaseBotAutoV2 extends LinearOpMode {
         Actions.runBlocking(
                 new SequentialAction(
                         robot.startIntake(),
-                        robot.actionBuilder(robot.localizer.getPose())
-                                .strafeToSplineHeading(
-                                        new Vector2d(PGP.position.x, (sideMultiplier * RobotState.getY(/*RobotState.getBallsIn() */ 0))),
-                                        Math.toRadians(facingGate),
-                                        new TranslationalVelConstraint(15.0),
-                                        new ProfileAccelConstraint(-15.0, 45.0)
-                                )
-                                .build()
+                        new RaceParallelAction(
+                                robot.actionBuilder(robot.localizer.getPose())
+                                        .strafeToSplineHeading(
+                                                new Vector2d(PGP.position.x, (sideMultiplier * RobotState.getY(RobotState.getBallsIn()))),
+                                                Math.toRadians(facingGate),
+                                                new TranslationalVelConstraint(15.0),
+                                                new ProfileAccelConstraint(-15.0, 45.0)
+                                        )
+                                        .build(),
+                                robot.intakeTracker.trackIntakeAction()
+                        ),
+                        robot.stopIntake()
                 )
         );
         RobotState.setCurrentPose(robot.localizer.getPose());
@@ -297,10 +306,10 @@ public class BaseBotAutoV2 extends LinearOpMode {
         Actions.runBlocking(
                 new SequentialAction(
                         new ParallelAction(
-                            robot.spinUpShooter(1100),
+                            robot.spinUpShooter(MOTOR_VELOCITY),
                             robot.autoalign()
                         ),
-                        robot.shootBall(3, 1100)
+                        robot.shootBall(3, MOTOR_VELOCITY)
                 )
         );
         RobotState.setCurrentPose(robot.localizer.getPose());
@@ -317,7 +326,7 @@ public class BaseBotAutoV2 extends LinearOpMode {
         // open the gate and redo
         Actions.runBlocking(
                 robot.actionBuilder(robot.localizer.getPose())
-                        .strafeToSplineHeading(new Vector2d(2, -58), Math.toRadians(90))
+                        .strafeToSplineHeading(new Vector2d(2, 58 * sideMultiplier), Math.toRadians(90))
                         .build()
         );
         RobotState.setCurrentPose(robot.localizer.getPose());
@@ -341,14 +350,17 @@ public class BaseBotAutoV2 extends LinearOpMode {
                                 )
                                 .build(),
                         robot.startIntake(),
-                        robot.actionBuilder(robot.localizer.getPose())
-                                .strafeToSplineHeading(
-                                        new Vector2d(GPP.position.x, (sideMultiplier * RobotState.getY(/* RobotState.getBallsIn() */ 0))),
-                                        Math.toRadians(facingGate),
-                                        new TranslationalVelConstraint(15.0),
-                                        new ProfileAccelConstraint(-15.0, 40.0)
-                                )
-                                .build(),
+                        new RaceParallelAction(
+                                robot.actionBuilder(robot.localizer.getPose())
+                                        .strafeToSplineHeading(
+                                                new Vector2d(GPP.position.x, (sideMultiplier * RobotState.getY(RobotState.getBallsIn()))),
+                                                Math.toRadians(facingGate),
+                                                new TranslationalVelConstraint(15.0),
+                                                new ProfileAccelConstraint(-15.0, 40.0)
+                                        )
+                                        .build(),
+                                robot.intakeTracker.trackIntakeAction()
+                        ),
                         robot.stopIntake()
                 )
         );

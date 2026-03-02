@@ -7,6 +7,7 @@ import com.acmerobotics.roadrunner.PoseVelocity2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.hardware.limelightvision.Limelight3A;
+import com.qualcomm.hardware.rev.RevColorSensorV3;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -14,8 +15,8 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DigitalChannel;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
+import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
-import com.qualcomm.robotcore.hardware.configuration.typecontainers.MotorConfigurationType;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
@@ -37,36 +38,44 @@ public class RobotHardware extends MecanumDrive {
     public GoBildaPrismDriver prism;
     public Limelight3A limelight;
     public Servo light1;
-    public DigitalChannel distance1;
-//    public DistanceSensor distanceSensor;
-//    public getPose() {
-//        return super();
-//    }
+    public Servo light2;
+    public Servo light3;
+    public Servo light4;
 
-    //    public Pose2d getPose() {
-//        return this.pose;
-//    }
+    public DigitalChannel distance1;
+    public RevColorSensorV3 color1;
+    public RevColorSensorV3 color2;
+
+    public IntakeTracker intakeTracker;
+//    public DistanceSensor distanceSensor;
     public RobotHardware(HardwareMap hardwareMap, Pose2d pose) {
         super(hardwareMap, pose);
 
+        // -- Sensors and peripherals --
+        color1 = hardwareMap.get(RevColorSensorV3.class, "color1");
+        color2 = hardwareMap.get(RevColorSensorV3.class, "color2");
         distance1 = hardwareMap.get(DigitalChannel.class, "distance1");
         distance1.setMode(DigitalChannel.Mode.INPUT);
-
         prism = hardwareMap.get(GoBildaPrismDriver.class, "prism");
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
         light1 = hardwareMap.get(Servo.class, "light1");
+        light2 = hardwareMap.get(Servo.class, "light2");
+        light3 = hardwareMap.get(Servo.class, "light3");
+        light4 = hardwareMap.get(Servo.class, "light4");
 
+        // -- Drivetrain motors --
         frontLeft = hardwareMap.get(DcMotorEx.class, "frontLeft");
         frontRight = hardwareMap.get(DcMotorEx.class, "frontRight");
         backLeft = hardwareMap.get(DcMotorEx.class, "backLeft");
         backRight = hardwareMap.get(DcMotorEx.class, "backRight");
 
+        // -- Mechanism motors --
         lShooter = hardwareMap.get(DcMotorEx.class, "lShooter");
         rShooter = hardwareMap.get(DcMotorEx.class, "rShooter");
         index = hardwareMap.get(DcMotorEx.class, "index");
         intake = hardwareMap.get(DcMotorEx.class, "intake");
 
-
+        // -- IMU --
         imu = hardwareMap.get(IMU.class, "imu");
 
         frontLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -88,8 +97,18 @@ public class RobotHardware extends MecanumDrive {
         lShooter.setDirection(DcMotorSimple.Direction.REVERSE);
         rShooter.setDirection(DcMotorSimple.Direction.FORWARD);
 
-        lShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
-        rShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        lShooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        rShooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        lShooter.setPIDFCoefficients(
+                DcMotor.RunMode.RUN_USING_ENCODER,
+                new PIDFCoefficients(Constants.Shooter.PID_P, Constants.Shooter.PID_I, Constants.Shooter.PID_D, Constants.Shooter.PID_F)
+        );
+        rShooter.setPIDFCoefficients(
+                DcMotor.RunMode.RUN_USING_ENCODER,
+                new PIDFCoefficients(Constants.Shooter.PID_P, Constants.Shooter.PID_I, Constants.Shooter.PID_D, Constants.Shooter.PID_F)
+        );
+//        lShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+//        rShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         lShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
         rShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
@@ -110,24 +129,53 @@ public class RobotHardware extends MecanumDrive {
         intake.setDirection(DcMotorSimple.Direction.FORWARD);
         intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        limelight.setPollRateHz(100);
+        limelight.setPollRateHz(Constants.Vision.LIMELIGHT_POLL_RATE_HZ);
         limelight.start();
+
+        intakeTracker = new IntakeTracker(this);
     }
 
+    /**
+     * Sets the power level for both shooter motors.
+     *
+     * @param power The power level to set, ranging from -1.0 to 1.0.
+     */
     public void setShooterPower(double power) {
         lShooter.setPower(power);
         rShooter.setPower(power);
     }
 
+    /**
+     * Gets the current velocity of the left shooter motor.
+     *
+     * @return The velocity in encoder ticks per second.
+     */
     public double getVelocity() {
         return lShooter.getVelocity();
     }
 
+
+    /**
+     * Sets the target velocity for both shooter motors using the built-in PIDF controller.
+     *
+     * @param velocity The target velocity in encoder ticks per second.
+     */
     public void setShooterVelocity(double velocity) {
         lShooter.setVelocity(velocity);
         rShooter.setVelocity(velocity);
     }
 
+
+
+    /**
+     * Creates an action that starts the intake motor.
+     * <p>
+     * This is a one-shot action that sets the intake motor power to 0.8
+     * and immediately completes.
+     * </p>
+     *
+     * @return An Action that starts the intake and returns {@code false} immediately.
+     */
     public Action startIntake() {
         return new IntakeStart();
     }
@@ -139,6 +187,7 @@ public class RobotHardware extends MecanumDrive {
         public boolean run(@NotNull TelemetryPacket packet) {
             if (!initalized) {
                 intake.setPower(0.8);
+                index.setPower(0.3);
                 initalized = true;
             }
 
@@ -146,6 +195,15 @@ public class RobotHardware extends MecanumDrive {
         }
     }
 
+    /**
+     * Creates an action that stops the intake motor.
+     * <p>
+     * This is a one-shot action that sets the intake motor power to 0
+     * and immediately completes.
+     * </p>
+     *
+     * @return An Action that stops the intake and returns {@code false} immediately.
+     */
     public Action stopIntake() {
         return new Action() {
             private boolean initialized = false;
@@ -154,12 +212,26 @@ public class RobotHardware extends MecanumDrive {
             public boolean run(@NotNull TelemetryPacket packet) {
                 if (!initialized) {
                     intake.setPower(0);
+                    index.setPower(0);
                     initialized = true;
                 }
                 return false;
             }
         };
     }
+
+    /**
+     * Creates an action that automatically aligns the robot to a target using the Limelight camera.
+     * <p>
+     * This action uses the Limelight's horizontal offset (tx) to rotate the robot
+     * until it is aligned with the detected target. The action completes when the
+     * robot is within the alignment threshold (tx between -1.9 and 1.6 degrees)
+     * or after a 500ms timeout.
+     * </p>
+     *
+     * @return An Action that returns {@code true} while aligning, and {@code false}
+     *         once aligned or timed out.
+     */
     public Action autoalign() {
         return new Action() {
             private boolean initialized = false;
@@ -170,13 +242,15 @@ public class RobotHardware extends MecanumDrive {
                 LLResult result = limelight.getLatestResult();
                 double tx = result.getTx();
 
-                setDrivePowers(new PoseVelocity2d(new Vector2d(0, 0), -(tx/27.25 * 0.8)));
+                if (tx == 0.0) {
+                    setDrivePowers(new PoseVelocity2d(new Vector2d(0, 0), -(tx/27.25 * 0.8)));
+                }
                 updatePoseEstimate();
 
                 light1.setPosition(.5);
                 packet.put("tx", tx);
                 packet.put("timer", timer.milliseconds());
-                if ((tx < 1.6 && tx > -1.9) || timer.milliseconds() >= 500) {
+                if ((tx < 0.6 && tx > -0.6) || timer.milliseconds() >= 500) {
                     light1.setPosition(0);
                     return false;
                 } else {
@@ -186,6 +260,18 @@ public class RobotHardware extends MecanumDrive {
         };
     }
 
+    /**
+     * Creates an action that spins up the shooter motors to a target velocity.
+     * <p>
+     * This action sets the shooter motors to the specified velocity and waits
+     * until the motors reach at least 1000 ticks/second before completing.
+     * This ensures the shooter is ready before attempting to shoot.
+     * </p>
+     *
+     * @param velocityTarget The target velocity in encoder ticks per second.
+     * @return An Action that returns {@code true} while spinning up, and {@code false}
+     *         once the shooter has reached sufficient speed.
+     */
     public Action spinUpShooter(double velocityTarget) {
         return new Action() {
             private boolean initialized = false;
@@ -202,6 +288,22 @@ public class RobotHardware extends MecanumDrive {
         };
     }
 
+    /**
+     * Creates an action that shoots a specified number of balls.
+     * <p>
+     * This action maintains the shooter at the target velocity and uses the
+     * distance sensor to count balls as they pass through. The index and intake
+     * motors are controlled based on shooter velocity to ensure consistent shots.
+     * The action completes when all balls have been shot or after a 7-second timeout.
+     * </p>
+     * <p>
+     * The shooter velocity is reduced by 600 ticks/second after completion to
+     * conserve power while keeping the motors warm.
+     * </p>
+     *
+     * @param ballsToShoot   The number of balls to shoot.
+     * @param velocityTarget The target shooter velocity in encoder ticks per second.
+     */
     public Action shootBall(int ballsToShoot, double velocityTarget) {
         return new Action() {
             private int ballsRemaining = ballsToShoot;
@@ -210,16 +312,18 @@ public class RobotHardware extends MecanumDrive {
 
             @Override
             public boolean run(@NotNull TelemetryPacket packet) {
+                intake.setPower(0.6);
                 lShooter.setVelocity(velocityTarget);
                 rShooter.setVelocity(velocityTarget);
 
                 boolean ballCurrentlySeen = distance1.getState();
                 if (ballCurrentlySeen && !lastSeenBall) {
+                    RobotState.setArtifacts(ballsRemaining - 1, null);
                     ballsRemaining--;
                 }
                 lastSeenBall = ballCurrentlySeen;
 
-                if (ballsRemaining <= 0) {
+                if (ballsRemaining <= 0 || timer.milliseconds() >= 6000) {
                     index.setPower(0);
                     intake.setPower(0);
                     light1.setPosition(0);
@@ -228,35 +332,25 @@ public class RobotHardware extends MecanumDrive {
                     return false;
                 }
 
-                double lVel = Math.abs(lShooter.getVelocity());
-                double rVel = Math.abs(rShooter.getVelocity());
 
-                if (timer.milliseconds() >= 7000) {
-                    index.setPower(0);
-                    intake.setPower(0);
-                    light1.setPosition(0);
-                    lShooter.setVelocity(velocityTarget - 600);
-                    RobotState.setBallsIn(ballsRemaining);
-                    return false;
-                }
+                double lVel = lShooter.getVelocity();
 
-
-                // Check if both shooter wheels are within the target velocity range
-                if (lVel > (velocityTarget-50) && lVel < (velocityTarget+65) && rVel > (velocityTarget-50) && rVel < (velocityTarget+65)) {
+                if (lVel > (velocityTarget-50) && lVel < (velocityTarget+65)) {
                     index.setPower(1.0);
                     intake.setPower(0.7);
                     light1.setPosition(0.7);
-                } else {
-                    index.setPower(0);
-                    intake.setPower(0.8);
-                    light1.setPosition(0);
                 }
+//                } else {
+//                    index.setPower(0);
+//                    intake.setPower(0.8);
+//                    light1.setPosition(0);
+//                }
 
                 packet.put("ballsRemaining", ballsRemaining);
                 packet.put("ballCurrentlySeen", ballCurrentlySeen);
                 packet.put("lastSeenBall", lastSeenBall);
-                packet.put("lShooterVelocity", lVel);
-                packet.put("rShooterVelocity", rVel);
+//                packet.put("lShooterVelocity", lVel);
+//                packet.put("rShooterVelocity", rVel);
                 return true;
             }
         };
