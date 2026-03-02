@@ -163,18 +163,20 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             double currentRpm = rawVelocity / TICKS_PER_REV * 60;
             telemetry.addData("Target RPM (Display)", targetRPM);
 
+
             // Ballistic solver: calculates required velocity (v) in ft/s
             Pose2d blueTower = new Pose2d(-60, -57, 0); // Tower position in inches (assumed)
 
-            double distanceToTowerInches = Math.sqrt(
-                Math.pow(robot.localizer.getPose().position.x - blueTower.position.x, 2) +
-                Math.pow(robot.localizer.getPose().position.y - blueTower.position.y, 2)
-            );
-            // Convert calculated distance from inches (RoadRunner default) to feet
-            targetDistance = distanceToTowerInches / 12.0; 
+            double limelightMountAngleDeg = 10;
+            double limelightInFromGround = 13.0;
+            double goalHeightInches = 29.5;
+            double angleToGoalDegrees = limelightMountAngleDeg + ty;
+            double angleToGoalRadians = Math.toRadians(angleToGoalDegrees);
+            double distanceToTowerInches = (goalHeightInches - limelightInFromGround) / Math.tan(angleToGoalRadians);
 
-            // The main ballistic equation (solved for v^2)
-            // v^2 = (g * x^2) / (2 * cos^2(theta) * (x * tan(theta) - y))
+            // Convert calculated distance from inches (RoadRunner default) to feet
+            targetDistance = distanceToTowerInches / 12.0;
+
             double numerator = GRAVITY_FT_S2 * Math.pow(targetDistance, 2);
             double denominator = 2 * Math.cos(LAUNCH_ANGLE_RAD) * Math.cos(LAUNCH_ANGLE_RAD)
                     * (targetDistance * Math.tan(LAUNCH_ANGLE_RAD) - TARGET_FEET);
@@ -189,13 +191,13 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             }
 
             // Convert ballistic velocity (ft/s) to motor velocity (ticks/s)
-            double motorRpm = (RPM_MAGIC_CONSTANT * velocity) / (Math.PI * SHOOTER_WHEEL_DIAMETER_FT) * RPM_EMPIRICAL_FACTOR;
-            double motorVelocity = motorRpm * TICKS_PER_REV / 60;
+//            double motorRpm = (RPM_MAGIC_CONSTANT * velocity) / (Math.PI * SHOOTER_WHEEL_DIAMETER_FT) * RPM_EMPIRICAL_FACTOR;
+//            double motorVelocity = motorRpm * TICKS_PER_REV / 60;
 
             telemetry.addData("Current RPM", currentRpm);
             addDebugTelemetry("Required Launch Velocity (ft/s)", velocity);
             addDebugTelemetry("Target Distance (feet)", targetDistance);
-            telemetry.addData("Required Motor Velocity (ticks/s)", motorVelocity);
+//            telemetry.addData("Required Motor Velocity (ticks/s)", motorVelocity);
             telemetry.addData("Launch Angle", "deg=" + LAUNCH_ANGLE_DEG);
 
             // --- Limelight Data Fetch ---
@@ -205,18 +207,14 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             // Fiducial (Tag) Results
             List<LLResultTypes.FiducialResult> fiducialResults = result.getFiducialResults();
             for (int i = 0; i < fiducialResults.size(); i++) {
-                if (!fiducialResults.isEmpty()) {
-                    telemetry.addData("Tag ID " + i, fiducialResults.get(i).getFiducialId());
-                }
+                telemetry.addData("Tag ID " + i, fiducialResults.get(i).getFiducialId());
             }
 
             // --- Drive Control (RoadRunner PoseVelocity) ---
             double turn = -gamepad1.right_stick_x * 0.6; // Base rotation speed
 
-            // Limelight Steering Assist
             double rxModifier = 0.0;
             if (bToggle) {
-                // Add assist to rotation
                 rxModifier = -((tx / 27.25) * 0.6);
                 turn += rxModifier;
             }
@@ -249,17 +247,14 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
             Gamepad mechGP = getMechanismGamepad();
 
             if (mechGP.right_trigger > RT_THRESHOLD) {
-                // RT pressed: Shoot (Index feed, Intake stop)
                 if (shooterOn) {
-                    indexPower = 1.0; // Index feed
-                    intakePower = 0.0; // Stop intake while shooting
+                    indexPower = 1.0;
+                    intakePower = 0.0;
                 }
             } else if (mechGP.dpad_right) {
-                // D-pad Right: Intake Reverse/Outtake
                 intakePower = -0.8;
                 indexPower = 0.0;
             } else if (mechGP.dpad_left) {
-                // D-pad Left: Intake
                 intakePower = 0.8;
                 indexPower = 0.0;
             } else if (mechGP.y) {
@@ -307,7 +302,7 @@ public class BasebotUnifiedTeleOp extends LinearOpMode {
                     robot.lShooter.setPower(shooterPower);
                 } else {
                     // Auto Velocity Mode (Ballistic Solver)
-                    robot.lShooter.setVelocity(motorVelocity);
+                    robot.lShooter.setVelocity(shooterRpm);
                 }
             } else {
                 // motors are off if can intake,
