@@ -1,10 +1,5 @@
 package org.firstinspires.ftc.teamcode;
 
-import android.graphics.Color;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
@@ -22,16 +17,11 @@ import com.qualcomm.robotcore.hardware.HardwareMap;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
-import com.qualcomm.robotcore.hardware.configuration.typecontainers.MotorConfigurationType;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.robotcore.external.JavaUtil;
 import org.firstinspires.ftc.teamcode.Prism.GoBildaPrismDriver;
 import org.firstinspires.ftc.teamcode.roadrunner.MecanumDrive;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.HashMap;
-import java.util.Map;
 
 public class RobotHardware extends MecanumDrive {
     public DcMotorEx frontLeft;
@@ -56,18 +46,16 @@ public class RobotHardware extends MecanumDrive {
     public RevColorSensorV3 color1;
     public RevColorSensorV3 color2;
 
-    public HashMap<Double, Double> speedMap = new HashMap<>();
+    public IntakeTracker intakeTracker;
 //    public DistanceSensor distanceSensor;
     public RobotHardware(HardwareMap hardwareMap, Pose2d pose) {
         super(hardwareMap, pose);
+
+        // -- Sensors and peripherals --
         color1 = hardwareMap.get(RevColorSensorV3.class, "color1");
         color2 = hardwareMap.get(RevColorSensorV3.class, "color2");
-
-
-
         distance1 = hardwareMap.get(DigitalChannel.class, "distance1");
         distance1.setMode(DigitalChannel.Mode.INPUT);
-
         prism = hardwareMap.get(GoBildaPrismDriver.class, "prism");
         limelight = hardwareMap.get(Limelight3A.class, "limelight");
         light1 = hardwareMap.get(Servo.class, "light1");
@@ -75,17 +63,19 @@ public class RobotHardware extends MecanumDrive {
         light3 = hardwareMap.get(Servo.class, "light3");
         light4 = hardwareMap.get(Servo.class, "light4");
 
+        // -- Drivetrain motors --
         frontLeft = hardwareMap.get(DcMotorEx.class, "frontLeft");
         frontRight = hardwareMap.get(DcMotorEx.class, "frontRight");
         backLeft = hardwareMap.get(DcMotorEx.class, "backLeft");
         backRight = hardwareMap.get(DcMotorEx.class, "backRight");
 
+        // -- Mechanism motors --
         lShooter = hardwareMap.get(DcMotorEx.class, "lShooter");
         rShooter = hardwareMap.get(DcMotorEx.class, "rShooter");
         index = hardwareMap.get(DcMotorEx.class, "index");
         intake = hardwareMap.get(DcMotorEx.class, "intake");
 
-
+        // -- IMU --
         imu = hardwareMap.get(IMU.class, "imu");
 
         frontLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
@@ -106,11 +96,19 @@ public class RobotHardware extends MecanumDrive {
 //        rShooter.setDirection(DcMotorSimple.Direction.REVERSE);
         lShooter.setDirection(DcMotorSimple.Direction.REVERSE);
         rShooter.setDirection(DcMotorSimple.Direction.FORWARD);
-        lShooter.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,  new PIDFCoefficients(24, 0.1, 0, 26));
-        rShooter.setPIDFCoefficients(DcMotor.RunMode.RUN_USING_ENCODER,  new PIDFCoefficients(24, 0.1, 0, 26));
 
         lShooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         rShooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        lShooter.setPIDFCoefficients(
+                DcMotor.RunMode.RUN_USING_ENCODER,
+                new PIDFCoefficients(Constants.Shooter.PID_P, Constants.Shooter.PID_I, Constants.Shooter.PID_D, Constants.Shooter.PID_F)
+        );
+        rShooter.setPIDFCoefficients(
+                DcMotor.RunMode.RUN_USING_ENCODER,
+                new PIDFCoefficients(Constants.Shooter.PID_P, Constants.Shooter.PID_I, Constants.Shooter.PID_D, Constants.Shooter.PID_F)
+        );
+//        lShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+//        rShooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         lShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
         rShooter.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
@@ -131,8 +129,10 @@ public class RobotHardware extends MecanumDrive {
         intake.setDirection(DcMotorSimple.Direction.FORWARD);
         intake.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
 
-        limelight.setPollRateHz(100);
+        limelight.setPollRateHz(Constants.Vision.LIMELIGHT_POLL_RATE_HZ);
         limelight.start();
+
+        intakeTracker = new IntakeTracker(this);
     }
 
     /**
@@ -154,6 +154,7 @@ public class RobotHardware extends MecanumDrive {
         return lShooter.getVelocity();
     }
 
+
     /**
      * Sets the target velocity for both shooter motors using the built-in PIDF controller.
      *
@@ -163,6 +164,8 @@ public class RobotHardware extends MecanumDrive {
         lShooter.setVelocity(velocity);
         rShooter.setVelocity(velocity);
     }
+
+
 
     /**
      * Creates an action that starts the intake motor.
@@ -184,93 +187,12 @@ public class RobotHardware extends MecanumDrive {
         public boolean run(@NotNull TelemetryPacket packet) {
             if (!initalized) {
                 intake.setPower(0.8);
+                index.setPower(0.3);
                 initalized = true;
             }
 
             return false;
         }
-    }
-
-    /**
-     * Creates an action that tracks ball intake using color sensors.
-     * <p>
-     * This action continuously monitors the color sensors to detect incoming balls,
-     * classifies them as GREEN or PURPLE based on hue values, and updates the
-     * corresponding indicator lights.
-     * </p>
-     *
-     * @return An Action that returns {@code true} while fewer than 3 balls have been
-     *         collected, and {@code false} once 3 or more balls are detected
-     *         (signaling the action is complete).
-     */
-    public Action trackIntake() {
-        return new Action() {
-            // Hue ranges for ball color detection
-            private static final double GREEN_HUE_MIN = 48;
-            private static final double GREEN_HUE_MAX = 165;
-            private static final double PURPLE_HUE_MIN = 211;
-            private static final double PURPLE_HUE_MAX = 338;
-
-            // Light positions for colors
-            private static final double LIGHT_PURPLE = 0.7;
-            private static final double LIGHT_GREEN = 0.5;
-
-            @Override
-            public boolean run(@NonNull TelemetryPacket telemetryPacket) {
-                double hue1 = JavaUtil.colorToHue(color1.getNormalizedColors().toColor());
-                double hue2 = JavaUtil.colorToHue(color2.getNormalizedColors().toColor());
-
-                Artifact detectedArtifact = detectArtifact(hue1, hue2);
-                if (detectedArtifact != null) {
-                    RobotState.setArtifacts(RobotState.getArtifactIndex(), detectedArtifact);
-                    updateIndicatorLight(RobotState.getArtifactIndex(), detectedArtifact);
-                } else {
-                    RobotState.setArtifactIndex(RobotState.getArtifactIndex() + 1);
-                }
-
-                return RobotState.getBallsIn() < 3;
-            }
-
-            /**
-             * Detects the artifact type based on hue values from both color sensors.
-             * @param hue1 Hue value from the first color sensor.
-             * @param hue2 Hue value from the second color sensor.
-             */
-            private Artifact detectArtifact(double hue1, double hue2) {
-                if (isInRange(hue1, GREEN_HUE_MIN, GREEN_HUE_MAX) ||
-                    isInRange(hue2, GREEN_HUE_MIN, GREEN_HUE_MAX)) {
-                    return Artifact.GREEN;
-                } else if (isInRange(hue1, PURPLE_HUE_MIN, PURPLE_HUE_MAX) ||
-                           isInRange(hue2, PURPLE_HUE_MIN, PURPLE_HUE_MAX)) {
-                    return Artifact.PURPLE;
-                }
-                return null;
-            }
-
-            private boolean isInRange(double value, double min, double max) {
-                return value > min && value < max;
-            }
-
-            /**
-             * Updates the indicator light for the given slot based on artifact type.
-             * @param slot The index of the indicator light slot.
-             * @param artifact The detected artifact type.
-             */
-            private void updateIndicatorLight(int slot, Artifact artifact) {
-                double position = (artifact == Artifact.PURPLE) ? LIGHT_PURPLE : LIGHT_GREEN;
-                switch (slot) {
-                    case 0:
-                        light2.setPosition(position);
-                        break;
-                    case 1:
-                        light3.setPosition(position);
-                        break;
-                    case 2:
-                        light4.setPosition(position);
-                        break;
-                }
-            }
-        };
     }
 
     /**
@@ -290,6 +212,7 @@ public class RobotHardware extends MecanumDrive {
             public boolean run(@NotNull TelemetryPacket packet) {
                 if (!initialized) {
                     intake.setPower(0);
+                    index.setPower(0);
                     initialized = true;
                 }
                 return false;
@@ -319,13 +242,15 @@ public class RobotHardware extends MecanumDrive {
                 LLResult result = limelight.getLatestResult();
                 double tx = result.getTx();
 
-                setDrivePowers(new PoseVelocity2d(new Vector2d(0, 0), -(tx/27.25 * 0.8)));
+                if (tx == 0.0) {
+                    setDrivePowers(new PoseVelocity2d(new Vector2d(0, 0), -(tx/27.25 * 0.8)));
+                }
                 updatePoseEstimate();
 
                 light1.setPosition(.5);
                 packet.put("tx", tx);
                 packet.put("timer", timer.milliseconds());
-                if ((tx < 1.6 && tx > -1.9) || timer.milliseconds() >= 500) {
+                if ((tx < 0.6 && tx > -0.6) || timer.milliseconds() >= 500) {
                     light1.setPosition(0);
                     return false;
                 } else {
@@ -387,6 +312,7 @@ public class RobotHardware extends MecanumDrive {
 
             @Override
             public boolean run(@NotNull TelemetryPacket packet) {
+                intake.setPower(0.6);
                 lShooter.setVelocity(velocityTarget);
                 rShooter.setVelocity(velocityTarget);
 
@@ -397,7 +323,7 @@ public class RobotHardware extends MecanumDrive {
                 }
                 lastSeenBall = ballCurrentlySeen;
 
-                if (ballsRemaining <= 0 || timer.milliseconds() >= 4000) {
+                if (ballsRemaining <= 0 || timer.milliseconds() >= 6000) {
                     index.setPower(0);
                     intake.setPower(0);
                     light1.setPosition(0);
@@ -406,27 +332,25 @@ public class RobotHardware extends MecanumDrive {
                     return false;
                 }
 
-                double lVel = Math.abs(lShooter.getVelocity());
-                double rVel = Math.abs(rShooter.getVelocity());
 
+                double lVel = lShooter.getVelocity();
 
-
-                // Check if both shooter wheels are within the target velocity range
-                if (lVel > (velocityTarget-50) && lVel < (velocityTarget+65) && rVel > (velocityTarget-50) && rVel < (velocityTarget+65)) {
+                if (lVel > (velocityTarget-50) && lVel < (velocityTarget+65)) {
                     index.setPower(1.0);
                     intake.setPower(0.7);
                     light1.setPosition(0.7);
-                } else {
-                    index.setPower(0);
-                    intake.setPower(0.8);
-                    light1.setPosition(0);
                 }
+//                } else {
+//                    index.setPower(0);
+//                    intake.setPower(0.8);
+//                    light1.setPosition(0);
+//                }
 
                 packet.put("ballsRemaining", ballsRemaining);
                 packet.put("ballCurrentlySeen", ballCurrentlySeen);
                 packet.put("lastSeenBall", lastSeenBall);
-                packet.put("lShooterVelocity", lVel);
-                packet.put("rShooterVelocity", rVel);
+//                packet.put("lShooterVelocity", lVel);
+//                packet.put("rShooterVelocity", rVel);
                 return true;
             }
         };

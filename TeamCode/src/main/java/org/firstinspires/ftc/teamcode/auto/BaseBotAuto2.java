@@ -2,11 +2,11 @@ package org.firstinspires.ftc.teamcode.auto;
 
 import com.acmerobotics.roadrunner.ParallelAction;
 import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 import com.acmerobotics.roadrunner.SequentialAction;
+import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
-import com.acmerobotics.roadrunner.TranslationalVelConstraint;
-import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 import com.qualcomm.hardware.limelightvision.LLResult;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -21,8 +21,8 @@ import org.firstinspires.ftc.teamcode.RobotState;
 
 import java.util.concurrent.TimeUnit;
 
-@Autonomous(name = "Basebot Auto")
-public class BaseBotAuto extends LinearOpMode {
+@Autonomous(name = "Basebot Auto v2")
+public class BaseBotAuto2 extends LinearOpMode {
     RobotHardware robot = null;
     double cycles = 4;
     boolean close;
